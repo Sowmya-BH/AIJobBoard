@@ -1,0 +1,41 @@
+# Render Blueprint. Jobs = read-only SQLite baked into the app image (ephemeral
+# FS is fine for immutable data). Mutable user data (users/profiles/saved_jobs)
+# -> managed Postgres via DATABASE_URL, so it survives deploys/restarts and is
+# shared across instances. Scorer stays a private paid service.
+# NOTE: free Postgres/plan names & expiry change — verify current Render docs.
+
+services:
+- type: pserv
+  name: resumehq-scorer
+  runtime: docker
+  plan: standard
+  dockerfilePath: ./scorer_service/Dockerfile
+  dockerContext: ./scorer_service
+  healthCheckPath: /health
+  envVars:
+  - key: ANTHROPIC_API_KEY
+    sync: false
+- type: web
+  name: job-scout-app
+  runtime: docker
+  plan: free
+  dockerfilePath: ./Dockerfile
+  dockerContext: .
+  healthCheckPath: /
+  envVars:
+  - key: RQ_SCORER_URL
+    fromService:
+      type: pserv
+      name: resumehq-scorer
+      property: hostport
+  - key: JOBS_INDEX
+    value: data/jobs_index.jsonl
+  - key: GEMINI_API_KEY
+    sync: false
+  - key: DATABASE_URL
+    fromDatabase:
+      name: jobscout-db
+      property: connectionString
+databases:
+- name: jobscout-db
+  plan: free

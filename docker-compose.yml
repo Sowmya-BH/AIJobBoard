@@ -1,0 +1,32 @@
+# ⚠ LOCAL DEV ONLY. Render ignores docker-compose — use render.yaml there.
+# Two containers, two memory budgets:
+#   app    — torch-free, stays within 512 MB, talks to the scorer over HTTP
+#   scorer — full ResumeHQ (torch/SBERT), its own (larger) budget, no quota
+services:
+  scorer:
+    build: ./scorer_service
+    # Optional: cover letters need this in the SCORER container (not the app)
+    # environment:
+    #   - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    expose:
+      - "8100"
+    deploy:
+      resources:
+        limits:
+          memory: 2g          # torch+SBERT need headroom; tune to your host
+
+  app:
+    build: .                  # uses the app's own Dockerfile / requirements.txt
+    depends_on:
+      - scorer
+    environment:
+      - RQ_SCORER_URL=http://scorer:8100   # <-- routes scoring to the sidecar
+      - APP_DB=data/app.db
+      # - GEMINI_API_KEY=${GEMINI_API_KEY}
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 512m         # the app fits here because it never imports torch
+    command: uvicorn server:app --host 0.0.0.0 --port 8000

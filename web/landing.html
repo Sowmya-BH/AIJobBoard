@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Welcome to Resume Parser</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,Segoe UI,Roboto,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px;width:420px;text-align:center}
+h1{font-size:26px;margin:0 0 8px}.sub{color:var(--mut);font-size:14px;margin-bottom:26px}
+.btns{display:flex;gap:12px}.btns a{flex:1;text-decoration:none;border-radius:10px;padding:12px;font-weight:600}
+.primary{background:var(--acc);color:#fff}.ghost{border:1px solid var(--line);color:var(--fg)}
+.feat{text-align:left;color:var(--mut);font-size:13px;margin-top:24px;line-height:1.9}
+.logo{font-size:40px;margin-bottom:6px}
+</style></head><body>
+<div class="card">
+  <div class="logo">📄</div>
+  <h1>Welcome to Resume Parser</h1>
+  <div class="sub">AI job matching · ATS scoring · tailored resumes & cover letters</div>
+  <div class="btns">
+    <a class="primary" href="/login">Log in</a>
+    <a class="ghost" href="/login#register">Register</a>
+  </div>
+  <div class="feat">
+    ✓ Match your resume against 57k+ jobs<br>
+    ✓ ResumeHQ ATS score with matched / missing skills<br>
+    ✓ "Why this score?" + should-I-apply verdict<br>
+    ✓ Save jobs, track applications, personalized dashboard
+  </div>
+</div>
+<script>
+  // already signed in? go straight to the parser
+  if(localStorage.getItem("token")) location.href="/app";
+</script>
+</body></html>

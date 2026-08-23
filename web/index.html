@@ -1,0 +1,1293 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Job Scout · ATS Agent</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff;--good:#3fb06a;--bad:#e2554b;--amb:#e0a13c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 18px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:19px;margin:0}a{color:var(--acc);text-decoration:none}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.chip b{font-size:18px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+input,select,textarea{width:100%;background:#0d0f14;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 13px;font:inherit;font-weight:500;cursor:pointer}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.cbx{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:13px;color:var(--mut)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.job:hover{border-color:var(--acc)}.job.sel{border-color:var(--acc);background:#1b2130}
+.job .m{color:var(--mut);font-size:12px;margin-top:2px}
+.star{float:right;cursor:pointer;color:var(--mut);font-size:16px}.star.on{color:var(--amb)}
+.big{font-size:30px;font-weight:700}.unit{font-size:14px;color:var(--mut)}
+.bar{height:12px;border-radius:6px;background:#0d0f14;border:1px solid var(--line);overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;background:var(--acc)}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;margin:3px 5px 0 0;border:1px solid var(--line)}
+.pill.g{border-color:#2c5c3f;color:#8fe0ac}.pill.b{border-color:#5c2c2c;color:#f0a19b}
+h3{font-size:13px;margin:14px 0 4px;color:var(--mut)}
+.jd{white-space:pre-wrap;font-size:13px;max-height:280px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px}
+.out{white-space:pre-wrap;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;font-size:13px}
+.note{background:#1a1f14;border:1px solid #3a4a1e;border-radius:8px;padding:10px;margin-top:8px;font-size:13px}
+.hide{display:none}.mut{color:var(--mut);font-size:13px}.verdict{font-size:22px;font-weight:700}
+.mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)}
+</style></head><body><div class="wrap">
+<div class="top"><h1>Job Scout · ATS Agent</h1><div id="who"></div></div>
+<div class="chips hide" id="dash"></div>
+
+<!-- 1) resume -->
+<div class="card">
+  <label>Your resume (paste or upload — used for AI match scoring)</label>
+  <textarea id="resume">Data scientist, 2 yrs. Skills: Python, SQL, Pandas, scikit-learn.</textarea>
+  <div class="row" style="margin-top:8px"><div style="flex:0"><input type="file" id="file" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+</div>
+
+<!-- 2) filters (moved to top) + single button -->
+<div class="card">
+  <label>Filters</label>
+  <label style="margin-top:4px">Job Source</label>
+  <select id="source"><option>All Sources</option></select>
+  <div class="row" style="margin-top:10px">
+    <div><label>Skills (comma)</label><input id="f-skills" placeholder="python, sql"/></div>
+    <div><label>Location</label><input id="f-loc" placeholder="Bengaluru"/></div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div><label>Min exp</label><input id="f-min" type="number" min="0"/></div>
+    <div><label>Max exp</label><input id="f-max" type="number" min="0"/></div>
+    <div><label>Domain</label><select id="f-domain"><option value="">Any</option></select></div>
+  </div>
+  <div class="cbx"><label style="margin:0"><input type="checkbox" id="f-remote" style="width:auto"/> Remote only</label></div>
+  <div style="margin-top:12px"><button onclick="analyzeSearch()">Analyze &amp; search</button>
+    <span class="mut" id="status"></span></div>
+  <div id="skills" class="mut" style="margin-top:8px"></div>
+</div>
+
+<!-- 3) ONE results list -->
+<div class="card hide" id="reccard"><label id="reclabel">Matching jobs</label><div id="results"></div></div>
+
+<!-- job detail + match -->
+<div class="grid">
+  <div>
+    <div class="card hide" id="detail">
+      <div id="d-head"></div>
+      <h3>Job description</h3><div class="jd" id="d-jd"></div>
+      <div id="posmarket" class="mut" style="margin-top:10px"></div>
+      <div style="margin-top:10px"><button onclick="scoreJob()">AI match score against my resume</button></div>
+    </div>
+  </div>
+  <div>
+    <div class="card hide" id="match">
+      <div class="mut" id="m-job"></div>
+      <div class="big"><span id="m-score">–</span><span class="unit">/100 AI match</span></div>
+      <div class="bar"><i id="m-bar" style="width:0%"></i></div>
+      <h3>Matched skills</h3><div id="m-matched"></div>
+      <h3>Missing</h3><div id="m-missing"></div>
+      <button class="ghost" style="margin-top:10px" onclick="toggleWhy()">Why this score?</button>
+      <div class="hide" id="why"><div class="note"><div class="mut">Should I apply?</div>
+        <span class="verdict" id="w-verdict">–</span> <span class="mut">— <span id="w-conf"></span>% confidence</span>
+        <h3>Why you're a match</h3><ul id="w-str" style="margin:0;padding-left:18px"></ul>
+        <h3>Potential concerns</h3><ul id="w-con" style="margin:0;padding-left:18px"></ul></div></div>
+      <h3>Actionable advice</h3><ul id="m-advice" style="margin:0;padding-left:18px"></ul>
+      <h3>Improve &amp; re-score</h3>
+      <div class="row"><div style="flex:3"><input id="edit" placeholder="Add experience, e.g. 'Deployed models on AWS'"/></div>
+        <div style="flex:0"><button onclick="addInfo()">Add &amp; re-score</button></div></div>
+      <div class="row" style="margin-top:6px"><div><label>…or upload a revised resume</label><input type="file" id="refile" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+      <div class="note hide" id="howto"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="extra('cover_letter')">Cover letter</button>
+        <button class="ghost" onclick="extra('interview_questions')">Interview Qs</button>
+        <button class="ghost" onclick="extra('tailored_resume')">Tailored resume</button></div>
+      <div id="m-out"></div>
+    </div>
+  </div>
+</div>
+
+<!-- settings + chat -->
+<div class="grid">
+  <div class="card">
+    <label>Assistant API key — bring your own (encrypted at rest)</label>
+    <div id="keystatus" class="mut">No key set.</div>
+    <div class="row" style="margin-top:6px">
+      <div><label>Provider</label><select id="k-provider">
+        <option value="openai">OpenAI</option><option value="anthropic">Anthropic</option>
+        <option value="gemini">Gemini</option><option value="groq">Groq</option>
+        <option value="custom">Custom (OpenAI-compatible)</option><option value="test">Test</option></select></div>
+      <div><label>Model</label><input id="k-model" placeholder="gpt-4o-mini / claude-3-5-sonnet / llama-3.1-8b-instant"/></div>
+    </div>
+    <div id="k-baseurl-wrap" style="display:none;margin-top:6px"><label>Base URL (custom)</label><input id="k-baseurl" placeholder="https://api.groq.com/openai/v1"/></div>
+    <label style="margin-top:6px">API key</label><input id="k-key" type="password" placeholder="paste key (stored encrypted)"/>
+    <div style="margin-top:8px"><button onclick="saveKey()">Validate &amp; save</button>
+      <button class="ghost" onclick="deleteKey()">Delete</button> <span id="kmsg" class="mut"></span></div>
+  </div>
+  <div class="card">
+    <label>Ask the assistant — jobs, your profile, prep</label>
+    <div id="chatlog" class="mut" style="max-height:220px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px">Set an API key, then ask a question. A selected job is used as context.</div>
+    <div class="row"><div style="flex:3"><input id="chatmsg" placeholder="e.g. What roles fit my skills? How should I prep?"/></div>
+      <div style="flex:0"><button onclick="sendChat()">Send</button></div></div>
+  </div>
+</div>
+
+<div class="card" id="marketcard"><label>Job Market Intelligence</label><div id="market" class="mut">loading…</div></div>
+</div>
+<script>
+if(!localStorage.getItem("token")){location.href="/login";}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const tok=()=>localStorage.getItem("token");
+const authH=()=>tok()?{"Authorization":"Bearer "+tok()}:{};
+async function jget(u){return (await fetch(u,{headers:authH()})).json();}
+async function jpost(u,b){return (await fetch(u,{method:"POST",headers:{"Content-Type":"application/json",...authH()},body:JSON.stringify(b||{})})).json();}
+let SEL=null,JOB=null,TID=null;
+
+(async function init(){
+  const u=localStorage.getItem("user");
+  $("who").innerHTML = u ? esc(JSON.parse(u).name||JSON.parse(u).email)+' · <a href="#" onclick="logout()">log out</a>' : '<a href="/login">Log in</a>';
+  if(tok()){const d=await jget("/api/dashboard");if(!d.detail){$("dash").classList.remove("hide");
+    $("dash").innerHTML=`<div class="chip" style="border-color:var(--acc)">Welcome, <b style="display:inline">${esc(d.name)}</b></div><div class="chip"><b>${d.new_jobs}</b>Jobs</div><div class="chip"><b>${d.recommended}</b>Recommended</div><div class="chip"><b>${d.saved}</b>Saved</div><div class="chip"><b>${d.applied}</b>Applied</div><div class="chip"><b>${d.interviews}</b>Interviews</div>`;}}
+  const f=await jget("/api/facets");
+  f.sources.forEach(s=>{if(s!=="All Sources")$("source").insertAdjacentHTML("beforeend",`<option>${esc(s)}</option>`);});
+  f.domains.forEach(d=>$("f-domain").insertAdjacentHTML("beforeend",`<option>${esc(d)}</option>`));
+  loadKey(); loadMarket();
+})();
+function logout(){localStorage.clear();location.href="/";}
+
+$("file").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);
+  const r=await fetch("/api/upload",{method:"POST",body:fd});$("resume").value=(await r.json()).resume_text||"";});
+
+// SINGLE button: analyze resume + apply filters -> one list
+async function analyzeSearch(){
+  const txt=$("resume").value.trim();
+  if(txt.length<30){$("status").textContent="Paste or upload a resume first.";return;}
+  $("status").textContent="Analyzing & searching…";
+  const body={resume_text:txt,
+    source: $("source").value==="All Sources"?null:$("source").value,
+    location: $("f-loc").value||null, domain: $("f-domain").value||null,
+    remote: $("f-remote").checked?true:null,
+    min_exp: $("f-min").value?parseInt($("f-min").value):null,
+    max_exp: $("f-max").value?parseInt($("f-max").value):null,
+    skills: $("f-skills").value||""};
+  const j=await jpost("/api/analyze",body);
+  if(j.detail){$("status").textContent=j.detail;return;}
+  $("status").textContent="";
+  $("skills").innerHTML="Detected skills: "+(j.skills||[]).slice(0,20).map(s=>`<span class="pill g">${esc(s)}</span>`).join(" ");
+  renderResults(j.recommended||[]);
+}
+function renderResults(jobs){
+  const c=$("reccard");c.classList.remove("hide");
+  $("reclabel").textContent=`Matching jobs (${jobs.length})`;
+  if(!jobs.length){$("results").innerHTML='<div class="mut">No matches for these filters. Try widening them.</div>';return;}
+  $("results").innerHTML=jobs.map(x=>{
+    const star=`<span class="star" title="Save" onclick="event.stopPropagation();saveJob('${x.id}',this)">★</span>`;
+    return `<div class="job" onclick="openJob('${x.id}',this)">${star}<b>${esc(x.title)}</b> <span class="pill g">${x.score}% match</span><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div></div>`;
+  }).join("");
+}
+async function saveJob(id,el){const r=await jpost("/api/jobs/"+id+"/save");if(!r.detail)el.classList.add("on");}
+
+async function openJob(id,el){
+  document.querySelectorAll(".job").forEach(x=>x.classList.remove("sel"));if(el)el.classList.add("sel");
+  const j=await jget("/api/jobs/"+id);JOB=j;SEL=id;
+  $("detail").classList.remove("hide");$("match").classList.add("hide");
+  $("d-head").innerHTML=`<b style="font-size:16px">${esc(j.title)}</b><div class="mut">${esc(j.company)} · ${esc(j.location)} · ${esc(j.source)}${j.remote?" · Remote":""}${j.apply_link?` · <a href="${esc(j.apply_link)}" target="_blank">apply ↗</a>`:""}</div>`;
+  $("d-jd").textContent=j.description||"(no description)";
+  $("detail").scrollIntoView({behavior:"smooth"});
+  jget("/api/market/position/"+id).then(pm=>{if(pm.error){$("posmarket").innerHTML="";return;}
+    const top=(pm.top_skills||[]).slice(0,8).map(x=>`<span class="pill">${esc(x.skill)} · ${x.count}</span>`).join("");
+    $("posmarket").innerHTML=`<b>Most requested skills for "${esc(pm.position)}"</b> <span class="mut">(${pm.postings} similar postings)</span><br>${top}`;});
+}
+async function scoreJob(){
+  if(!SEL)return;
+  $("match").classList.remove("hide");$("m-score").textContent="…";$("m-bar").style.width="0%";$("m-out").innerHTML="";$("why").classList.add("hide");$("howto").classList.add("hide");
+  const s=await jpost("/api/start",{resume_text:$("resume").value,domain:JOB.domain||null});
+  if(s.detail){$("m-out").innerHTML='<div class="out">'+esc(s.detail)+'</div>';return;}
+  TID=s.thread_id; renderMatch((await jpost("/api/select",{thread_id:TID,job_id:SEL})).ats);
+}
+function renderMatch(a){
+  if(!a)return;$("match").classList.remove("hide");
+  $("m-job").textContent=a.job_title+" · "+a.company;
+  const sc=a.ats_score==null?0:a.ats_score;
+  $("m-score").textContent=a.ats_score==null?"n/a":a.ats_score;$("m-bar").style.width=sc+"%";
+  $("m-matched").innerHTML=(a._raw?.matched_keywords||[]).slice(0,12).map(k=>`<span class="pill g">✓ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("m-missing").innerHTML=(a._raw?.missing_keywords||[]).slice(0,12).map(k=>`<span class="pill b">✗ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("w-verdict").textContent=a.apply_verdict||"—";$("w-conf").textContent=a.apply_confidence??"?";
+  $("w-str").innerHTML=(a.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("w-con").innerHTML=(a.concerns||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("m-advice").innerHTML=(a.advice||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  if(a.error)$("m-out").innerHTML='<div class="out">Scorer: '+esc(a.error)+'. Start the scorer sidecar or install resumehq.</div>';
+}
+function toggleWhy(){$("why").classList.toggle("hide");}
+async function addInfo(){const t=$("edit").value.trim();if(!t||!TID)return;
+  const r=await jpost("/api/action",{thread_id:TID,action:"add_info",text:t});$("edit").value="";
+  if(r.how_to_add){$("howto").classList.remove("hide");$("howto").innerHTML="<b>How to add this:</b><br>"+esc(r.how_to_add);}
+  renderMatch(r.ats);}
+$("refile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f||!TID)return;const fd=new FormData();fd.append("file",f);
+  const txt=(await (await fetch("/api/upload",{method:"POST",body:fd})).json()).resume_text||"";
+  renderMatch((await jpost("/api/action",{thread_id:TID,action:"upload_resume",resume_text:txt})).ats);});
+async function extra(act){$("m-out").innerHTML='<div class="mut">generating…</div>';
+  const r=await jpost("/api/action",{thread_id:TID,action:act});const v=(r.artifacts||{})[act];
+  const body=Array.isArray(v)?v.map((x,i)=>(i+1)+". "+x).join("\n"):(v||"(empty)");
+  $("m-out").innerHTML='<div class="out">'+esc(body)+'</div>';}
+
+async function loadKey(){
+  const k=await jget("/api/settings/apikey");
+  if(k.has_key){$("keystatus").innerHTML=`Key set — ${esc(k.provider)} · ${esc(k.model||"")} · ${esc(k.masked)}`;
+    $("k-provider").value=k.provider;$("k-model").value=k.model||"";if(k.base_url)$("k-baseurl").value=k.base_url;
+    $("k-baseurl-wrap").style.display=k.provider==="custom"?"block":"none";}
+  else $("keystatus").textContent="No key set.";
+}
+document.addEventListener("change",e=>{if(e.target&&e.target.id==="k-provider"){
+  $("k-baseurl-wrap").style.display=e.target.value==="custom"?"block":"none";}});
+async function saveKey(){
+  $("kmsg").textContent="validating…";
+  const r=await fetch("/api/settings/apikey",{method:"PUT",headers:{"Content-Type":"application/json",...authH()},
+    body:JSON.stringify({provider:$("k-provider").value,model:$("k-model").value,api_key:$("k-key").value,base_url:$("k-baseurl")?$("k-baseurl").value:""})});
+  const j=await r.json();
+  if(!r.ok){$("kmsg").textContent=j.detail||"failed";return;}
+  $("kmsg").textContent="saved ✓";$("k-key").value="";loadKey();
+}
+async function deleteKey(){await fetch("/api/settings/apikey",{method:"DELETE",headers:authH()});$("kmsg").textContent="deleted";loadKey();}
+async function sendChat(){
+  const m=$("chatmsg").value.trim();if(!m)return;$("chatmsg").value="";
+  const log=$("chatlog");log.classList.remove("mut");
+  log.innerHTML+=`<div style="margin:6px 0"><b>You:</b> ${esc(m)}</div>`;
+  const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",...authH()},body:JSON.stringify({message:m,job_id:SEL||null})});
+  const j=await r.json();
+  log.innerHTML+=`<div style="margin:6px 0"><b>Assistant:</b> ${esc(r.ok?j.reply:(j.detail||"error"))}</div>`;log.scrollTop=log.scrollHeight;
+}
+async function loadMarket(){
+  const m=await jget("/api/market?domain=Data Science");
+  const skills=m.top_skills.slice(0,10).map(s=>`<div class="mrow"><span>${esc(s.skill)}</span><span>${s.count}</span></div>`).join("");
+  const comp=m.top_companies.slice(0,6).map(c=>`<div class="mrow"><span>${esc(c.name)}</span><span>${c.jobs}</span></div>`).join("");
+  const emg=(m.emerging_skills||[]).slice(0,6).map(e=>`<span class="pill ${e.change_pct>=0?'g':'b'}">${esc(e.skill)} ${e.change_pct>=0?'↑':'↓'}${Math.abs(e.change_pct)}%</span>`).join("")||'<span class="mut">n/a</span>';
+  const rem=m.remote_vs_onsite;
+  $("market").innerHTML=`<div class="grid"><div><h3>Most requested skills</h3>${skills}</div>
+    <div><h3>Top companies hiring</h3>${comp}<h3>Remote vs onsite</h3><div class="mrow"><span>Remote</span><span>${rem.remote}</span></div><div class="mrow"><span>Onsite</span><span>${rem.onsite}</span></div>
+    <h3>Emerging (MoM)</h3>${emg}</div></div><div class="mut" style="margin-top:8px">${esc(m.note)}</div>`;
+}
+</script></body></html>
+
+
+<!-- <!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Job Scout · ATS Agent</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff;--good:#3fb06a;--bad:#e2554b;--amb:#e0a13c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 18px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:19px;margin:0}a{color:var(--acc);text-decoration:none}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.chip b{font-size:18px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+input,select,textarea{width:100%;background:#0d0f14;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 13px;font:inherit;font-weight:500;cursor:pointer}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.cbx{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:13px;color:var(--mut)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.job:hover{border-color:var(--acc)}.job.sel{border-color:var(--acc);background:#1b2130}
+.job .m{color:var(--mut);font-size:12px;margin-top:2px}
+.star{float:right;cursor:pointer;color:var(--mut);font-size:16px}.star.on{color:var(--amb)}
+.big{font-size:30px;font-weight:700}.unit{font-size:14px;color:var(--mut)}
+.bar{height:12px;border-radius:6px;background:#0d0f14;border:1px solid var(--line);overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;background:var(--acc)}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;margin:3px 5px 0 0;border:1px solid var(--line)}
+.pill.g{border-color:#2c5c3f;color:#8fe0ac}.pill.b{border-color:#5c2c2c;color:#f0a19b}
+h3{font-size:13px;margin:14px 0 4px;color:var(--mut)}
+.jd{white-space:pre-wrap;font-size:13px;max-height:280px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px}
+.out{white-space:pre-wrap;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;font-size:13px}
+.note{background:#1a1f14;border:1px solid #3a4a1e;border-radius:8px;padding:10px;margin-top:8px;font-size:13px}
+.verdict{font-size:22px;font-weight:700}.hide{display:none}.mut{color:var(--mut);font-size:13px}
+.mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)}
+</style></head><body><div class="wrap">
+<div class="top"><h1>Job Scout · ATS Agent</h1><div id="who"></div></div>
+<div class="chips hide" id="dash"></div>
+
+<div class="card">
+  <label>Your resume (paste or upload — used for AI match scoring)</label>
+  <textarea id="resume">Data scientist, 2 yrs. Skills: Python, SQL, Pandas, scikit-learn.</textarea>
+  <div class="row" style="margin-top:8px"><div style="flex:0"><input type="file" id="file" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div><div style="flex:0"><button onclick="analyzeResume()">Analyze &amp; recommend</button></div></div>
+  <div id="skills" class="mut" style="margin-top:8px"></div>
+</div>
+
+<div class="card hide" id="reccard"><label>Recommended for you</label><div id="rec"></div></div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <label>Job Source</label>
+      <select id="source"><option>All Sources</option></select>
+      <div class="row" style="margin-top:10px">
+        <div><label>Skills (comma)</label><input id="f-skills" placeholder="python, sql"/></div>
+        <div><label>Location</label><input id="f-loc" placeholder="Bengaluru"/></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Min exp</label><input id="f-min" type="number" min="0"/></div>
+        <div><label>Max exp</label><input id="f-max" type="number" min="0"/></div>
+        <div><label>Domain</label><select id="f-domain"><option value="">Any</option></select></div>
+      </div>
+      <div class="cbx"><label style="margin:0"><input type="checkbox" id="f-remote" style="width:auto"/> Remote only</label></div>
+      <div style="margin-top:10px"><button onclick="searchJobs()">Search jobs</button>
+        <span class="mut" id="jstatus"></span></div>
+    </div>
+    <div class="card" id="listcard"><label>Results — click a job</label><div id="jobs"></div></div>
+  </div>
+
+  <div>
+    <div class="card hide" id="detail">
+      <div id="d-head"></div>
+      <h3>Job description</h3><div class="jd" id="d-jd"></div>
+      <div id="posmarket" class="mut" style="margin-top:10px"></div>
+      <div style="margin-top:10px"><button onclick="scoreJob()">AI match score against my resume</button></div>
+    </div>
+
+    <div class="card hide" id="match">
+      <div class="mut" id="m-job"></div>
+      <div class="big"><span id="m-score">–</span><span class="unit">/100 AI match</span></div>
+      <div class="bar"><i id="m-bar" style="width:0%"></i></div>
+      <h3>Matched skills</h3><div id="m-matched"></div>
+      <h3>Missing</h3><div id="m-missing"></div>
+      <button class="ghost" style="margin-top:10px" onclick="toggleWhy()">Why this score?</button>
+      <div class="hide" id="why">
+        <div class="note"><div class="mut">Should I apply?</div>
+          <span class="verdict" id="w-verdict">–</span> <span class="mut">— <span id="w-conf"></span>% confidence</span>
+          <h3>Why you're a match</h3><ul id="w-str" style="margin:0;padding-left:18px"></ul>
+          <h3>Potential concerns</h3><ul id="w-con" style="margin:0;padding-left:18px"></ul>
+        </div>
+      </div>
+      <h3>Actionable advice</h3><ul id="m-advice" style="margin:0;padding-left:18px"></ul>
+      <h3>Improve &amp; re-score</h3>
+      <div class="row"><div style="flex:3"><input id="edit" placeholder="Add experience, e.g. 'Deployed models on AWS'"/></div>
+        <div style="flex:0"><button onclick="addInfo()">Add &amp; re-score</button></div></div>
+      <div class="row" style="margin-top:6px"><div><label>…or upload a revised resume</label><input type="file" id="refile" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+      <div class="note hide" id="howto"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="extra('cover_letter')">Cover letter</button>
+        <button class="ghost" onclick="extra('interview_questions')">Interview Qs</button>
+        <button class="ghost" onclick="extra('tailored_resume')">Tailored resume</button>
+      </div>
+      <div id="m-out"></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <label>Assistant API key — bring your own (encrypted at rest)</label>
+    <div id="keystatus" class="mut">No key set.</div>
+    <div class="row" style="margin-top:6px">
+      <div><label>Provider</label><select id="k-provider">
+        <option value="openai">OpenAI</option><option value="anthropic">Anthropic</option>
+        <option value="gemini">Gemini</option><option value="groq">Groq</option><option value="custom">Custom (OpenAI-compatible)</option><option value="test">Test</option></select></div>
+      <div><label>Model</label><input id="k-model" placeholder="gpt-4o-mini / claude-3-5-sonnet / gemini-1.5-flash"/></div>
+    </div>
+    <div id="k-baseurl-wrap" style="display:none;margin-top:6px"><label>Base URL (custom)</label><input id="k-baseurl" placeholder="https://api.groq.com/openai/v1"/></div>
+    <label style="margin-top:6px">API key</label><input id="k-key" type="password" placeholder="paste key (stored encrypted)"/>
+    <div style="margin-top:8px"><button onclick="saveKey()">Validate &amp; save</button>
+      <button class="ghost" onclick="deleteKey()">Delete</button> <span id="kmsg" class="mut"></span></div>
+  </div>
+  <div class="card">
+    <label>Ask the assistant — jobs, your profile, prep</label>
+    <div id="chatlog" class="mut" style="max-height:220px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px">Set an API key, then ask a question. If a job is selected, it's used as context.</div>
+    <div class="row"><div style="flex:3"><input id="chatmsg" placeholder="e.g. What roles fit my skills? How should I prep?"/></div>
+      <div style="flex:0"><button onclick="sendChat()">Send</button></div></div>
+  </div>
+</div>
+
+<div class="card" id="marketcard"><label>Job Market Intelligence</label><div id="market" class="mut">loading…</div></div>
+</div>
+<script>
+if(!localStorage.getItem("token")){location.href="/login";}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const tok=()=>localStorage.getItem("token");
+const authH=()=>tok()?{"Authorization":"Bearer "+tok()}:{};
+async function jget(u){const r=await fetch(u,{headers:authH()});return r.json();}
+async function jpost(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json",...authH()},body:JSON.stringify(b||{})});return r.json();}
+let TID=null,JOB=null,SEL=null;
+
+// header + dashboard
+(async function init(){
+  const u=localStorage.getItem("user");
+  $("who").innerHTML = u ? esc(JSON.parse(u).name||JSON.parse(u).email)+' · <a href="#" onclick="logout()">log out</a>' : '<a href="/login">Log in</a>';
+  if(tok()){const d=await jget("/api/dashboard");if(!d.detail){$("dash").classList.remove("hide");
+    $("dash").innerHTML=`<div class="chip"><b>${d.new_jobs}</b>Jobs</div><div class="chip"><b>${d.recommended}</b>Recommended</div><div class="chip"><b>${d.saved}</b>Saved</div><div class="chip"><b>${d.applied}</b>Applied</div><div class="chip"><b>${d.interviews}</b>Interviews</div>`;
+    $("dash").insertAdjacentHTML("afterbegin",`<div class="chip" style="border-color:var(--acc)">Welcome, <b style="display:inline">${esc(d.name)}</b></div>`);}}
+  const f=await jget("/api/facets");
+  f.sources.forEach(s=>{if(s!=="All Sources")$("source").insertAdjacentHTML("beforeend",`<option>${esc(s)}</option>`);});
+  f.domains.forEach(d=>$("f-domain").insertAdjacentHTML("beforeend",`<option>${esc(d)}</option>`));
+  loadMarket(); loadKey();
+})();
+function logout(){localStorage.clear();location.href="/";}
+
+$("file").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);
+  const r=await fetch("/api/upload",{method:"POST",body:fd});$("resume").value=(await r.json()).resume_text||"";});
+
+async function searchJobs(){
+  const p=new URLSearchParams();
+  if($("source").value!=="All Sources")p.set("source",$("source").value);
+  if($("f-skills").value)p.set("skills",$("f-skills").value);
+  if($("f-loc").value)p.set("location",$("f-loc").value);
+  if($("f-min").value)p.set("min_exp",$("f-min").value);
+  if($("f-max").value)p.set("max_exp",$("f-max").value);
+  if($("f-domain").value)p.set("domain",$("f-domain").value);
+  if($("f-remote").checked)p.set("remote","true");
+  p.set("limit","30");
+  $("jstatus").textContent="…";
+  const j=(await jget("/api/jobs?"+p)).jobs||[];
+  $("jstatus").textContent=j.length+" jobs";
+  $("jobs").innerHTML="";
+  j.forEach(x=>{const d=document.createElement("div");d.className="job";
+    const star=tok()?`<span class="star" title="Save" onclick="event.stopPropagation();saveJob('${x.id}',this)">★</span>`:"";
+    d.innerHTML=`${star}<b>${esc(x.title)}</b><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div>`;
+    d.onclick=()=>openJob(x.id,d);$("jobs").appendChild(d);});
+}
+async function saveJob(id,el){const r=await jpost("/api/jobs/"+id+"/save");if(!r.detail){el.classList.add("on");}}
+
+async function openJob(id,el){el=el||null;
+  document.querySelectorAll(".job").forEach(x=>x.classList.remove("sel"));if(el)el.classList.add("sel");
+  const j=await jget("/api/jobs/"+id);JOB=j;SEL=id;
+  $("detail").classList.remove("hide");$("match").classList.add("hide");
+  $("d-head").innerHTML=`<b style="font-size:16px">${esc(j.title)}</b><div class="mut">${esc(j.company)} · ${esc(j.location)} · ${esc(j.source)}${j.remote?" · Remote":""}${j.apply_link?` · <a href="${esc(j.apply_link)}" target="_blank">apply ↗</a>`:""}</div>`;
+  $("d-jd").textContent=j.description||"(no description)";
+  jget("/api/market/position/"+id).then(pm=>{
+    if(pm.error){$("posmarket").innerHTML="";return;}
+    const top=(pm.top_skills||[]).slice(0,8).map(x=>`<span class="pill">${esc(x.skill)} · ${x.count}</span>`).join("");
+    $("posmarket").innerHTML=`<b>Most requested skills for "${esc(pm.position)}"</b> <span class="mut">(${pm.postings} similar postings)</span><br>${top}`;
+  });
+  $("detail").scrollIntoView({behavior:"smooth"});
+}
+
+async function scoreJob(){
+  if(!SEL)return;
+  $("match").classList.remove("hide");$("m-score").textContent="…";$("m-bar").style.width="0%";$("m-out").innerHTML="";$("why").classList.add("hide");$("howto").classList.add("hide");
+  const s=await jpost("/api/start",{resume_text:$("resume").value,domain:JOB.domain||null});
+  if(s.detail){$("m-out").innerHTML='<div class="out">'+esc(s.detail)+'</div>';return;}
+  TID=s.thread_id;
+  const r=await jpost("/api/select",{thread_id:TID,job_id:SEL});
+  renderMatch(r.ats);
+}
+function renderMatch(a){
+  if(!a){return;}
+  $("match").classList.remove("hide");
+  $("m-job").textContent=a.job_title+" · "+a.company;
+  const sc=a.ats_score==null?0:a.ats_score;
+  $("m-score").textContent=a.ats_score==null?"n/a":a.ats_score;$("m-bar").style.width=sc+"%";
+  $("m-matched").innerHTML=(a._raw?.matched_keywords||[]).slice(0,12).map(k=>`<span class="pill g">✓ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("m-missing").innerHTML=(a._raw?.missing_keywords||[]).slice(0,12).map(k=>`<span class="pill b">✗ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("w-verdict").textContent=a.apply_verdict||"—";$("w-conf").textContent=a.apply_confidence??"?";
+  $("w-str").innerHTML=(a.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("w-con").innerHTML=(a.concerns||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("m-advice").innerHTML=(a.advice||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  if(a.error)$("m-out").innerHTML='<div class="out">Scorer: '+esc(a.error)+'. Start the scorer sidecar or install resumehq.</div>';
+}
+function toggleWhy(){$("why").classList.toggle("hide");}
+async function addInfo(){const t=$("edit").value.trim();if(!t||!TID)return;
+  const r=await jpost("/api/action",{thread_id:TID,action:"add_info",text:t});$("edit").value="";
+  if(r.how_to_add){$("howto").classList.remove("hide");$("howto").innerHTML="<b>How to add this:</b><br>"+esc(r.how_to_add);}
+  renderMatch(r.ats);}
+$("refile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f||!TID)return;const fd=new FormData();fd.append("file",f);
+  const txt=(await (await fetch("/api/upload",{method:"POST",body:fd})).json()).resume_text||"";
+  renderMatch((await jpost("/api/action",{thread_id:TID,action:"upload_resume",resume_text:txt})).ats);});
+async function extra(act){$("m-out").innerHTML='<div class="mut">generating…</div>';
+  const r=await jpost("/api/action",{thread_id:TID,action:act});const v=(r.artifacts||{})[act];
+  const body=Array.isArray(v)?v.map((x,i)=>(i+1)+". "+x).join("\n"):(v||"(empty)");
+  $("m-out").innerHTML='<div class="out">'+esc(body)+'</div>';}
+
+async function analyzeResume(){
+  const txt=$("resume").value.trim();
+  if(txt.length<30){$("skills").textContent="Paste or upload a resume first.";return;}
+  $("skills").textContent="Analyzing resume…";
+  const j=await jpost("/api/analyze",{resume_text:txt});
+  if(j.detail){$("skills").textContent=j.detail;return;}
+  $("skills").innerHTML="Detected skills: "+(j.skills||[]).slice(0,20).map(s=>`<span class="pill g">${esc(s)}</span>`).join(" ");
+  renderRecommended(j.recommended||[]);
+}
+function renderRecommended(jobs){
+  const c=$("reccard"); if(!jobs.length){c.classList.add("hide");return;}
+  c.classList.remove("hide");
+  $("rec").innerHTML=jobs.slice(0,10).map(x=>`<div class="job" onclick="openJob('${x.id}')"><b>${esc(x.title)}</b> <span class="pill g">${x.score}% match</span><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div></div>`).join("");
+}
+async function loadKey(){
+  const k=await jget("/api/settings/apikey");
+  if(k.has_key){$("keystatus").innerHTML=`Key set — ${esc(k.provider)} · ${esc(k.model||"")} · ${esc(k.masked)}`;
+    $("k-provider").value=k.provider;$("k-model").value=k.model||"";if(k.base_url){$("k-baseurl").value=k.base_url;}$("k-baseurl-wrap").style.display=k.provider==="custom"?"block":"none";}
+  else $("keystatus").textContent="No key set.";
+}
+document.addEventListener("change",e=>{ if(e.target&&e.target.id==="k-provider"){
+  document.getElementById("k-baseurl-wrap").style.display = e.target.value==="custom" ? "block":"none"; }});
+async function saveKey(){
+  $("kmsg").textContent="validating…";
+  const r=await fetch("/api/settings/apikey",{method:"PUT",headers:{"Content-Type":"application/json",...authH()},
+    body:JSON.stringify({provider:$("k-provider").value,model:$("k-model").value,api_key:$("k-key").value,base_url:$("k-baseurl")?$("k-baseurl").value:""})});
+  const j=await r.json();
+  if(!r.ok){$("kmsg").textContent=j.detail||"failed";return;}
+  $("kmsg").textContent="saved ✓";$("k-key").value="";loadKey();
+}
+async function deleteKey(){await fetch("/api/settings/apikey",{method:"DELETE",headers:authH()});
+  $("kmsg").textContent="deleted";loadKey();}
+async function sendChat(){
+  const m=$("chatmsg").value.trim();if(!m)return;$("chatmsg").value="";
+  const log=$("chatlog");log.classList.remove("mut");
+  log.innerHTML+=`<div style="margin:6px 0"><b>You:</b> ${esc(m)}</div>`;
+  const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",...authH()},
+    body:JSON.stringify({message:m,job_id:(typeof SEL!=="undefined"?SEL:null)})});
+  const j=await r.json();
+  log.innerHTML+=`<div style="margin:6px 0"><b>Assistant:</b> ${esc(r.ok?j.reply:(j.detail||"error"))}</div>`;
+  log.scrollTop=log.scrollHeight;
+}
+async function loadMarket(){
+  const m=await jget("/api/market?domain=Data Science");
+  const max=Math.max(...m.top_skills.map(s=>s.count),1);
+  const skills=m.top_skills.slice(0,10).map(s=>`<div class="mrow"><span>${esc(s.skill)}</span><span>${s.count}</span></div>`).join("");
+  const comp=m.top_companies.slice(0,6).map(c=>`<div class="mrow"><span>${esc(c.name)}</span><span>${c.jobs}</span></div>`).join("");
+  const emg=(m.emerging_skills||[]).slice(0,6).map(e=>`<span class="pill ${e.change_pct>=0?'g':'b'}">${esc(e.skill)} ${e.change_pct>=0?'↑':'↓'}${Math.abs(e.change_pct)}%</span>`).join("")||'<span class="mut">n/a</span>';
+  const rem=m.remote_vs_onsite;
+  $("market").innerHTML=`<div class="grid"><div><h3>Most requested skills</h3>${skills}</div>
+    <div><h3>Top companies hiring</h3>${comp}
+    <h3>Remote vs onsite</h3><div class="mrow"><span>Remote</span><span>${rem.remote}</span></div><div class="mrow"><span>Onsite</span><span>${rem.onsite}</span></div>
+    <h3>Emerging (MoM)</h3>${emg}</div></div><div class="mut" style="margin-top:8px">${esc(m.note)}</div>`;
+}
+</script></body></html> -->
+
+
+
+
+<!-- <!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Job Scout · ATS Agent</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff;--good:#3fb06a;--bad:#e2554b;--amb:#e0a13c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 18px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:19px;margin:0}a{color:var(--acc);text-decoration:none}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.chip b{font-size:18px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+input,select,textarea{width:100%;background:#0d0f14;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 13px;font:inherit;font-weight:500;cursor:pointer}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.cbx{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:13px;color:var(--mut)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.job:hover{border-color:var(--acc)}.job.sel{border-color:var(--acc);background:#1b2130}
+.job .m{color:var(--mut);font-size:12px;margin-top:2px}
+.star{float:right;cursor:pointer;color:var(--mut);font-size:16px}.star.on{color:var(--amb)}
+.big{font-size:30px;font-weight:700}.unit{font-size:14px;color:var(--mut)}
+.bar{height:12px;border-radius:6px;background:#0d0f14;border:1px solid var(--line);overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;background:var(--acc)}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;margin:3px 5px 0 0;border:1px solid var(--line)}
+.pill.g{border-color:#2c5c3f;color:#8fe0ac}.pill.b{border-color:#5c2c2c;color:#f0a19b}
+h3{font-size:13px;margin:14px 0 4px;color:var(--mut)}
+.jd{white-space:pre-wrap;font-size:13px;max-height:280px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px}
+.out{white-space:pre-wrap;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;font-size:13px}
+.note{background:#1a1f14;border:1px solid #3a4a1e;border-radius:8px;padding:10px;margin-top:8px;font-size:13px}
+.verdict{font-size:22px;font-weight:700}.hide{display:none}.mut{color:var(--mut);font-size:13px}
+.mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)}
+</style></head><body><div class="wrap">
+<div class="top"><h1>Job Scout · ATS Agent</h1><div id="who"></div></div>
+<div class="chips hide" id="dash"></div>
+
+<div class="card">
+  <label>Your resume (paste or upload — used for AI match scoring)</label>
+  <textarea id="resume">Data scientist, 2 yrs. Skills: Python, SQL, Pandas, scikit-learn.</textarea>
+  <div class="row" style="margin-top:8px"><div style="flex:0"><input type="file" id="file" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div><div style="flex:0"><button onclick="analyzeResume()">Analyze &amp; recommend</button></div></div>
+  <div id="skills" class="mut" style="margin-top:8px"></div>
+</div>
+
+<div class="card hide" id="reccard"><label>Recommended for you</label><div id="rec"></div></div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <label>Job Source</label>
+      <select id="source"><option>All Sources</option></select>
+      <div class="row" style="margin-top:10px">
+        <div><label>Skills (comma)</label><input id="f-skills" placeholder="python, sql"/></div>
+        <div><label>Location</label><input id="f-loc" placeholder="Bengaluru"/></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Min exp</label><input id="f-min" type="number" min="0"/></div>
+        <div><label>Max exp</label><input id="f-max" type="number" min="0"/></div>
+        <div><label>Domain</label><select id="f-domain"><option value="">Any</option></select></div>
+      </div>
+      <div class="cbx"><label style="margin:0"><input type="checkbox" id="f-remote" style="width:auto"/> Remote only</label></div>
+      <div style="margin-top:10px"><button onclick="searchJobs()">Search jobs</button>
+        <span class="mut" id="jstatus"></span></div>
+    </div>
+    <div class="card" id="listcard"><label>Results — click a job</label><div id="jobs"></div></div>
+  </div>
+
+  <div>
+    <div class="card hide" id="detail">
+      <div id="d-head"></div>
+      <h3>Job description</h3><div class="jd" id="d-jd"></div>
+      <div id="posmarket" class="mut" style="margin-top:10px"></div>
+      <div style="margin-top:10px"><button onclick="scoreJob()">AI match score against my resume</button></div>
+    </div>
+
+    <div class="card hide" id="match">
+      <div class="mut" id="m-job"></div>
+      <div class="big"><span id="m-score">–</span><span class="unit">/100 AI match</span></div>
+      <div class="bar"><i id="m-bar" style="width:0%"></i></div>
+      <h3>Matched skills</h3><div id="m-matched"></div>
+      <h3>Missing</h3><div id="m-missing"></div>
+      <button class="ghost" style="margin-top:10px" onclick="toggleWhy()">Why this score?</button>
+      <div class="hide" id="why">
+        <div class="note"><div class="mut">Should I apply?</div>
+          <span class="verdict" id="w-verdict">–</span> <span class="mut">— <span id="w-conf"></span>% confidence</span>
+          <h3>Why you're a match</h3><ul id="w-str" style="margin:0;padding-left:18px"></ul>
+          <h3>Potential concerns</h3><ul id="w-con" style="margin:0;padding-left:18px"></ul>
+        </div>
+      </div>
+      <h3>Actionable advice</h3><ul id="m-advice" style="margin:0;padding-left:18px"></ul>
+      <h3>Improve &amp; re-score</h3>
+      <div class="row"><div style="flex:3"><input id="edit" placeholder="Add experience, e.g. 'Deployed models on AWS'"/></div>
+        <div style="flex:0"><button onclick="addInfo()">Add &amp; re-score</button></div></div>
+      <div class="row" style="margin-top:6px"><div><label>…or upload a revised resume</label><input type="file" id="refile" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+      <div class="note hide" id="howto"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="extra('cover_letter')">Cover letter</button>
+        <button class="ghost" onclick="extra('interview_questions')">Interview Qs</button>
+        <button class="ghost" onclick="extra('tailored_resume')">Tailored resume</button>
+      </div>
+      <div id="m-out"></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <label>Assistant API key — bring your own (encrypted at rest)</label>
+    <div id="keystatus" class="mut">No key set.</div>
+    <div class="row" style="margin-top:6px">
+      <div><label>Provider</label><select id="k-provider">
+        <option value="openai">OpenAI</option><option value="anthropic">Anthropic</option>
+        <option value="gemini">Gemini</option><option value="groq">Groq</option><option value="custom">Custom (OpenAI-compatible)</option><option value="test">Test</option></select></div>
+      <div><label>Model</label><input id="k-model" placeholder="gpt-4o-mini / claude-3-5-sonnet / gemini-1.5-flash"/></div>
+    </div>
+    <div id="k-baseurl-wrap" style="display:none;margin-top:6px"><label>Base URL (custom)</label><input id="k-baseurl" placeholder="https://api.groq.com/openai/v1"/></div>
+    <label style="margin-top:6px">API key</label><input id="k-key" type="password" placeholder="paste key (stored encrypted)"/>
+    <div style="margin-top:8px"><button onclick="saveKey()">Validate &amp; save</button>
+      <button class="ghost" onclick="deleteKey()">Delete</button> <span id="kmsg" class="mut"></span></div>
+  </div>
+  <div class="card">
+    <label>Ask the assistant — jobs, your profile, prep</label>
+    <div id="chatlog" class="mut" style="max-height:220px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px">Set an API key, then ask a question. If a job is selected, it's used as context.</div>
+    <div class="row"><div style="flex:3"><input id="chatmsg" placeholder="e.g. What roles fit my skills? How should I prep?"/></div>
+      <div style="flex:0"><button onclick="sendChat()">Send</button></div></div>
+  </div>
+</div>
+
+<div class="card" id="marketcard"><label>Job Market Intelligence</label><div id="market" class="mut">loading…</div></div>
+</div>
+<script>
+if(!localStorage.getItem("token")){location.href="/login";}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const tok=()=>localStorage.getItem("token");
+const authH=()=>tok()?{"Authorization":"Bearer "+tok()}:{};
+async function jget(u){const r=await fetch(u,{headers:authH()});return r.json();}
+async function jpost(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json",...authH()},body:JSON.stringify(b||{})});return r.json();}
+let TID=null,JOB=null,SEL=null;
+
+// header + dashboard
+(async function init(){
+  const u=localStorage.getItem("user");
+  $("who").innerHTML = u ? esc(JSON.parse(u).name||JSON.parse(u).email)+' · <a href="#" onclick="logout()">log out</a>' : '<a href="/login">Log in</a>';
+  if(tok()){const d=await jget("/api/dashboard");if(!d.detail){$("dash").classList.remove("hide");
+    $("dash").innerHTML=`<div class="chip"><b>${d.new_jobs}</b>Jobs</div><div class="chip"><b>${d.recommended}</b>Recommended</div><div class="chip"><b>${d.saved}</b>Saved</div><div class="chip"><b>${d.applied}</b>Applied</div><div class="chip"><b>${d.interviews}</b>Interviews</div>`;
+    $("dash").insertAdjacentHTML("afterbegin",`<div class="chip" style="border-color:var(--acc)">Welcome, <b style="display:inline">${esc(d.name)}</b></div>`);}}
+  const f=await jget("/api/facets");
+  f.sources.forEach(s=>{if(s!=="All Sources")$("source").insertAdjacentHTML("beforeend",`<option>${esc(s)}</option>`);});
+  f.domains.forEach(d=>$("f-domain").insertAdjacentHTML("beforeend",`<option>${esc(d)}</option>`));
+  loadMarket(); loadKey();
+})();
+function logout(){localStorage.clear();location.href="/";}
+
+$("file").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);
+  const r=await fetch("/api/upload",{method:"POST",body:fd});$("resume").value=(await r.json()).resume_text||"";});
+
+async function searchJobs(){
+  const p=new URLSearchParams();
+  if($("source").value!=="All Sources")p.set("source",$("source").value);
+  if($("f-skills").value)p.set("skills",$("f-skills").value);
+  if($("f-loc").value)p.set("location",$("f-loc").value);
+  if($("f-min").value)p.set("min_exp",$("f-min").value);
+  if($("f-max").value)p.set("max_exp",$("f-max").value);
+  if($("f-domain").value)p.set("domain",$("f-domain").value);
+  if($("f-remote").checked)p.set("remote","true");
+  p.set("limit","30");
+  $("jstatus").textContent="…";
+  const j=(await jget("/api/jobs?"+p)).jobs||[];
+  $("jstatus").textContent=j.length+" jobs";
+  $("jobs").innerHTML="";
+  j.forEach(x=>{const d=document.createElement("div");d.className="job";
+    const star=tok()?`<span class="star" title="Save" onclick="event.stopPropagation();saveJob('${x.id}',this)">★</span>`:"";
+    d.innerHTML=`${star}<b>${esc(x.title)}</b><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div>`;
+    d.onclick=()=>openJob(x.id,d);$("jobs").appendChild(d);});
+}
+async function saveJob(id,el){const r=await jpost("/api/jobs/"+id+"/save");if(!r.detail){el.classList.add("on");}}
+
+async function openJob(id,el){el=el||null;
+  document.querySelectorAll(".job").forEach(x=>x.classList.remove("sel"));if(el)el.classList.add("sel");
+  const j=await jget("/api/jobs/"+id);JOB=j;SEL=id;
+  $("detail").classList.remove("hide");$("match").classList.add("hide");
+  $("d-head").innerHTML=`<b style="font-size:16px">${esc(j.title)}</b><div class="mut">${esc(j.company)} · ${esc(j.location)} · ${esc(j.source)}${j.remote?" · Remote":""}${j.apply_link?` · <a href="${esc(j.apply_link)}" target="_blank">apply ↗</a>`:""}</div>`;
+  $("d-jd").textContent=j.description||"(no description)";
+  jget("/api/market/position/"+id).then(pm=>{
+    if(pm.error){$("posmarket").innerHTML="";return;}
+    const top=(pm.top_skills||[]).slice(0,8).map(x=>`<span class="pill">${esc(x.skill)} · ${x.count}</span>`).join("");
+    $("posmarket").innerHTML=`<b>Most requested skills for "${esc(pm.position)}"</b> <span class="mut">(${pm.postings} similar postings)</span><br>${top}`;
+  });
+  $("detail").scrollIntoView({behavior:"smooth"});
+}
+
+async function scoreJob(){
+  if(!SEL)return;
+  $("match").classList.remove("hide");$("m-score").textContent="…";$("m-bar").style.width="0%";$("m-out").innerHTML="";$("why").classList.add("hide");$("howto").classList.add("hide");
+  const s=await jpost("/api/start",{resume_text:$("resume").value,domain:JOB.domain||null});
+  if(s.detail){$("m-out").innerHTML='<div class="out">'+esc(s.detail)+'</div>';return;}
+  TID=s.thread_id;
+  const r=await jpost("/api/select",{thread_id:TID,job_id:SEL});
+  renderMatch(r.ats);
+}
+function renderMatch(a){
+  if(!a){return;}
+  $("match").classList.remove("hide");
+  $("m-job").textContent=a.job_title+" · "+a.company;
+  const sc=a.ats_score==null?0:a.ats_score;
+  $("m-score").textContent=a.ats_score==null?"n/a":a.ats_score;$("m-bar").style.width=sc+"%";
+  $("m-matched").innerHTML=(a._raw?.matched_keywords||[]).slice(0,12).map(k=>`<span class="pill g">✓ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("m-missing").innerHTML=(a._raw?.missing_keywords||[]).slice(0,12).map(k=>`<span class="pill b">✗ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("w-verdict").textContent=a.apply_verdict||"—";$("w-conf").textContent=a.apply_confidence??"?";
+  $("w-str").innerHTML=(a.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("w-con").innerHTML=(a.concerns||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("m-advice").innerHTML=(a.advice||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  if(a.error)$("m-out").innerHTML='<div class="out">Scorer: '+esc(a.error)+'. Start the scorer sidecar or install resumehq.</div>';
+}
+function toggleWhy(){$("why").classList.toggle("hide");}
+async function addInfo(){const t=$("edit").value.trim();if(!t||!TID)return;
+  const r=await jpost("/api/action",{thread_id:TID,action:"add_info",text:t});$("edit").value="";
+  if(r.how_to_add){$("howto").classList.remove("hide");$("howto").innerHTML="<b>How to add this:</b><br>"+esc(r.how_to_add);}
+  renderMatch(r.ats);}
+$("refile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f||!TID)return;const fd=new FormData();fd.append("file",f);
+  const txt=(await (await fetch("/api/upload",{method:"POST",body:fd})).json()).resume_text||"";
+  renderMatch((await jpost("/api/action",{thread_id:TID,action:"upload_resume",resume_text:txt})).ats);});
+async function extra(act){$("m-out").innerHTML='<div class="mut">generating…</div>';
+  const r=await jpost("/api/action",{thread_id:TID,action:act});const v=(r.artifacts||{})[act];
+  const body=Array.isArray(v)?v.map((x,i)=>(i+1)+". "+x).join("\n"):(v||"(empty)");
+  $("m-out").innerHTML='<div class="out">'+esc(body)+'</div>';}
+
+async function analyzeResume(){
+  const txt=$("resume").value.trim();
+  if(txt.length<30){$("skills").textContent="Paste or upload a resume first.";return;}
+  $("skills").textContent="Analyzing resume…";
+  const j=await jpost("/api/analyze",{resume_text:txt});
+  if(j.detail){$("skills").textContent=j.detail;return;}
+  $("skills").innerHTML="Detected skills: "+(j.skills||[]).slice(0,20).map(s=>`<span class="pill g">${esc(s)}</span>`).join(" ");
+  renderRecommended(j.recommended||[]);
+}
+function renderRecommended(jobs){
+  const c=$("reccard"); if(!jobs.length){c.classList.add("hide");return;}
+  c.classList.remove("hide");
+  $("rec").innerHTML=jobs.slice(0,10).map(x=>`<div class="job" onclick="openJob('${x.id}')"><b>${esc(x.title)}</b> <span class="pill g">${x.score}% match</span><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div></div>`).join("");
+}
+async function loadKey(){
+  const k=await jget("/api/settings/apikey");
+  if(k.has_key){$("keystatus").innerHTML=`Key set — ${esc(k.provider)} · ${esc(k.model||"")} · ${esc(k.masked)}`;
+    $("k-provider").value=k.provider;$("k-model").value=k.model||"";if(k.base_url){$("k-baseurl").value=k.base_url;}$("k-baseurl-wrap").style.display=k.provider==="custom"?"block":"none";}
+  else $("keystatus").textContent="No key set.";
+}
+document.addEventListener("change",e=>{ if(e.target&&e.target.id==="k-provider"){
+  document.getElementById("k-baseurl-wrap").style.display = e.target.value==="custom" ? "block":"none"; }});
+async function saveKey(){
+  $("kmsg").textContent="validating…";
+  const r=await fetch("/api/settings/apikey",{method:"PUT",headers:{"Content-Type":"application/json",...authH()},
+    body:JSON.stringify({provider:$("k-provider").value,model:$("k-model").value,api_key:$("k-key").value,base_url:$("k-baseurl")?$("k-baseurl").value:""})});
+  const j=await r.json();
+  if(!r.ok){$("kmsg").textContent=j.detail||"failed";return;}
+  $("kmsg").textContent="saved ✓";$("k-key").value="";loadKey();
+}
+async function deleteKey(){await fetch("/api/settings/apikey",{method:"DELETE",headers:authH()});
+  $("kmsg").textContent="deleted";loadKey();}
+async function sendChat(){
+  const m=$("chatmsg").value.trim();if(!m)return;$("chatmsg").value="";
+  const log=$("chatlog");log.classList.remove("mut");
+  log.innerHTML+=`<div style="margin:6px 0"><b>You:</b> ${esc(m)}</div>`;
+  const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",...authH()},
+    body:JSON.stringify({message:m,job_id:(typeof SEL!=="undefined"?SEL:null)})});
+  const j=await r.json();
+  log.innerHTML+=`<div style="margin:6px 0"><b>Assistant:</b> ${esc(r.ok?j.reply:(j.detail||"error"))}</div>`;
+  log.scrollTop=log.scrollHeight;
+}
+async function loadMarket(){
+  const m=await jget("/api/market?domain=Data Science");
+  const max=Math.max(...m.top_skills.map(s=>s.count),1);
+  const skills=m.top_skills.slice(0,10).map(s=>`<div class="mrow"><span>${esc(s.skill)}</span><span>${s.count}</span></div>`).join("");
+  const comp=m.top_companies.slice(0,6).map(c=>`<div class="mrow"><span>${esc(c.name)}</span><span>${c.jobs}</span></div>`).join("");
+  const emg=(m.emerging_skills||[]).slice(0,6).map(e=>`<span class="pill ${e.change_pct>=0?'g':'b'}">${esc(e.skill)} ${e.change_pct>=0?'↑':'↓'}${Math.abs(e.change_pct)}%</span>`).join("")||'<span class="mut">n/a</span>';
+  const rem=m.remote_vs_onsite;
+  $("market").innerHTML=`<div class="grid"><div><h3>Most requested skills</h3>${skills}</div>
+    <div><h3>Top companies hiring</h3>${comp}
+    <h3>Remote vs onsite</h3><div class="mrow"><span>Remote</span><span>${rem.remote}</span></div><div class="mrow"><span>Onsite</span><span>${rem.onsite}</span></div>
+    <h3>Emerging (MoM)</h3>${emg}</div></div><div class="mut" style="margin-top:8px">${esc(m.note)}</div>`;
+}
+</script></body></html>
+
+<!-- <!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Job Scout · ATS Agent</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff;--good:#3fb06a;--bad:#e2554b;--amb:#e0a13c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 18px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:19px;margin:0}a{color:var(--acc);text-decoration:none}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.chip b{font-size:18px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+input,select,textarea{width:100%;background:#0d0f14;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 13px;font:inherit;font-weight:500;cursor:pointer}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.cbx{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:13px;color:var(--mut)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.job:hover{border-color:var(--acc)}.job.sel{border-color:var(--acc);background:#1b2130}
+.job .m{color:var(--mut);font-size:12px;margin-top:2px}
+.star{float:right;cursor:pointer;color:var(--mut);font-size:16px}.star.on{color:var(--amb)}
+.big{font-size:30px;font-weight:700}.unit{font-size:14px;color:var(--mut)}
+.bar{height:12px;border-radius:6px;background:#0d0f14;border:1px solid var(--line);overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;background:var(--acc)}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;margin:3px 5px 0 0;border:1px solid var(--line)}
+.pill.g{border-color:#2c5c3f;color:#8fe0ac}.pill.b{border-color:#5c2c2c;color:#f0a19b}
+h3{font-size:13px;margin:14px 0 4px;color:var(--mut)}
+.jd{white-space:pre-wrap;font-size:13px;max-height:280px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px}
+.out{white-space:pre-wrap;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;font-size:13px}
+.note{background:#1a1f14;border:1px solid #3a4a1e;border-radius:8px;padding:10px;margin-top:8px;font-size:13px}
+.verdict{font-size:22px;font-weight:700}.hide{display:none}.mut{color:var(--mut);font-size:13px}
+.mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)}
+</style></head><body><div class="wrap">
+<div class="top"><h1>Job Scout · ATS Agent</h1><div id="who"></div></div>
+<div class="chips hide" id="dash"></div>
+
+<div class="card">
+  <label>Your resume (paste or upload — used for AI match scoring)</label>
+  <textarea id="resume">Data scientist, 2 yrs. Skills: Python, SQL, Pandas, scikit-learn.</textarea>
+  <div class="row" style="margin-top:8px"><div style="flex:0"><input type="file" id="file" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+</div>
+
+<div class="card hide" id="reccard"><label>Recommended for you</label><div id="rec"></div></div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <label>Job Source</label>
+      <select id="source"><option>All Sources</option></select>
+      <div class="row" style="margin-top:10px">
+        <div><label>Skills (comma)</label><input id="f-skills" placeholder="python, sql"/></div>
+        <div><label>Location</label><input id="f-loc" placeholder="Bengaluru"/></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Min exp</label><input id="f-min" type="number" min="0"/></div>
+        <div><label>Max exp</label><input id="f-max" type="number" min="0"/></div>
+        <div><label>Domain</label><select id="f-domain"><option value="">Any</option></select></div>
+      </div>
+      <div class="cbx"><label style="margin:0"><input type="checkbox" id="f-remote" style="width:auto"/> Remote only</label></div>
+      <div style="margin-top:10px"><button onclick="searchJobs()">Search jobs</button>
+        <span class="mut" id="jstatus"></span></div>
+    </div>
+    <div class="card" id="listcard"><label>Results — click a job</label><div id="jobs"></div></div>
+  </div>
+
+  <div>
+    <div class="card hide" id="detail">
+      <div id="d-head"></div>
+      <h3>Job description</h3><div class="jd" id="d-jd"></div>
+      <div id="posmarket" class="mut" style="margin-top:10px"></div>
+      <div style="margin-top:10px"><button onclick="scoreJob()">AI match score against my resume</button></div>
+    </div>
+
+    <div class="card hide" id="match">
+      <div class="mut" id="m-job"></div>
+      <div class="big"><span id="m-score">–</span><span class="unit">/100 AI match</span></div>
+      <div class="bar"><i id="m-bar" style="width:0%"></i></div>
+      <h3>Matched skills</h3><div id="m-matched"></div>
+      <h3>Missing</h3><div id="m-missing"></div>
+      <button class="ghost" style="margin-top:10px" onclick="toggleWhy()">Why this score?</button>
+      <div class="hide" id="why">
+        <div class="note"><div class="mut">Should I apply?</div>
+          <span class="verdict" id="w-verdict">–</span> <span class="mut">— <span id="w-conf"></span>% confidence</span>
+          <h3>Why you're a match</h3><ul id="w-str" style="margin:0;padding-left:18px"></ul>
+          <h3>Potential concerns</h3><ul id="w-con" style="margin:0;padding-left:18px"></ul>
+        </div>
+      </div>
+      <h3>Actionable advice</h3><ul id="m-advice" style="margin:0;padding-left:18px"></ul>
+      <h3>Improve &amp; re-score</h3>
+      <div class="row"><div style="flex:3"><input id="edit" placeholder="Add experience, e.g. 'Deployed models on AWS'"/></div>
+        <div style="flex:0"><button onclick="addInfo()">Add &amp; re-score</button></div></div>
+      <div class="row" style="margin-top:6px"><div><label>…or upload a revised resume</label><input type="file" id="refile" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+      <div class="note hide" id="howto"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="extra('cover_letter')">Cover letter</button>
+        <button class="ghost" onclick="extra('interview_questions')">Interview Qs</button>
+        <button class="ghost" onclick="extra('tailored_resume')">Tailored resume</button>
+      </div>
+      <div id="m-out"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="marketcard"><label>Job Market Intelligence</label><div id="market" class="mut">loading…</div></div>
+</div>
+<script>
+if(!localStorage.getItem("token")){location.href="/login";}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const tok=()=>localStorage.getItem("token");
+const authH=()=>tok()?{"Authorization":"Bearer "+tok()}:{};
+async function jget(u){const r=await fetch(u,{headers:authH()});return r.json();}
+async function jpost(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json",...authH()},body:JSON.stringify(b||{})});return r.json();}
+let TID=null,JOB=null,SEL=null;
+
+// header + dashboard
+(async function init(){
+  const u=localStorage.getItem("user");
+  $("who").innerHTML = u ? esc(JSON.parse(u).name||JSON.parse(u).email)+' · <a href="#" onclick="logout()">log out</a>' : '<a href="/login">Log in</a>';
+  if(tok()){const d=await jget("/api/dashboard");if(!d.detail){$("dash").classList.remove("hide");
+    $("dash").innerHTML=`<div class="chip"><b>${d.new_jobs}</b>Jobs</div><div class="chip"><b>${d.recommended}</b>Recommended</div><div class="chip"><b>${d.saved}</b>Saved</div><div class="chip"><b>${d.applied}</b>Applied</div><div class="chip"><b>${d.interviews}</b>Interviews</div>`;
+    $("dash").insertAdjacentHTML("afterbegin",`<div class="chip" style="border-color:var(--acc)">Welcome, <b style="display:inline">${esc(d.name)}</b></div>`);loadRecommended();}}
+  const f=await jget("/api/facets");
+  f.sources.forEach(s=>{if(s!=="All Sources")$("source").insertAdjacentHTML("beforeend",`<option>${esc(s)}</option>`);});
+  f.domains.forEach(d=>$("f-domain").insertAdjacentHTML("beforeend",`<option>${esc(d)}</option>`));
+  loadMarket(); searchJobs();
+})();
+function logout(){localStorage.clear();location.href="/";}
+
+$("file").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);
+  const r=await fetch("/api/upload",{method:"POST",body:fd});$("resume").value=(await r.json()).resume_text||"";});
+
+async function searchJobs(){
+  const p=new URLSearchParams();
+  if($("source").value!=="All Sources")p.set("source",$("source").value);
+  if($("f-skills").value)p.set("skills",$("f-skills").value);
+  if($("f-loc").value)p.set("location",$("f-loc").value);
+  if($("f-min").value)p.set("min_exp",$("f-min").value);
+  if($("f-max").value)p.set("max_exp",$("f-max").value);
+  if($("f-domain").value)p.set("domain",$("f-domain").value);
+  if($("f-remote").checked)p.set("remote","true");
+  p.set("limit","30");
+  $("jstatus").textContent="…";
+  const j=(await jget("/api/jobs?"+p)).jobs||[];
+  $("jstatus").textContent=j.length+" jobs";
+  $("jobs").innerHTML="";
+  j.forEach(x=>{const d=document.createElement("div");d.className="job";
+    const star=tok()?`<span class="star" title="Save" onclick="event.stopPropagation();saveJob('${x.id}',this)">★</span>`:"";
+    d.innerHTML=`${star}<b>${esc(x.title)}</b><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div>`;
+    d.onclick=()=>openJob(x.id,d);$("jobs").appendChild(d);});
+}
+async function saveJob(id,el){const r=await jpost("/api/jobs/"+id+"/save");if(!r.detail){el.classList.add("on");}}
+
+async function openJob(id,el){el=el||null;
+  document.querySelectorAll(".job").forEach(x=>x.classList.remove("sel"));if(el)el.classList.add("sel");
+  const j=await jget("/api/jobs/"+id);JOB=j;SEL=id;
+  $("detail").classList.remove("hide");$("match").classList.add("hide");
+  $("d-head").innerHTML=`<b style="font-size:16px">${esc(j.title)}</b><div class="mut">${esc(j.company)} · ${esc(j.location)} · ${esc(j.source)}${j.remote?" · Remote":""}${j.apply_link?` · <a href="${esc(j.apply_link)}" target="_blank">apply ↗</a>`:""}</div>`;
+  $("d-jd").textContent=j.description||"(no description)";
+  jget("/api/market/position/"+id).then(pm=>{
+    if(pm.error){$("posmarket").innerHTML="";return;}
+    const top=(pm.top_skills||[]).slice(0,8).map(x=>`<span class="pill">${esc(x.skill)} · ${x.count}</span>`).join("");
+    $("posmarket").innerHTML=`<b>Most requested skills for "${esc(pm.position)}"</b> <span class="mut">(${pm.postings} similar postings)</span><br>${top}`;
+  });
+  $("detail").scrollIntoView({behavior:"smooth"});
+}
+
+async function scoreJob(){
+  if(!SEL)return;
+  $("match").classList.remove("hide");$("m-score").textContent="…";$("m-bar").style.width="0%";$("m-out").innerHTML="";$("why").classList.add("hide");$("howto").classList.add("hide");
+  const s=await jpost("/api/start",{resume_text:$("resume").value,domain:JOB.domain||null});
+  if(s.detail){$("m-out").innerHTML='<div class="out">'+esc(s.detail)+'</div>';return;}
+  TID=s.thread_id;
+  const r=await jpost("/api/select",{thread_id:TID,job_id:SEL});
+  renderMatch(r.ats);
+}
+function renderMatch(a){
+  if(!a){return;}
+  $("match").classList.remove("hide");
+  $("m-job").textContent=a.job_title+" · "+a.company;
+  const sc=a.ats_score==null?0:a.ats_score;
+  $("m-score").textContent=a.ats_score==null?"n/a":a.ats_score;$("m-bar").style.width=sc+"%";
+  $("m-matched").innerHTML=(a._raw?.matched_keywords||[]).slice(0,12).map(k=>`<span class="pill g">✓ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("m-missing").innerHTML=(a._raw?.missing_keywords||[]).slice(0,12).map(k=>`<span class="pill b">✗ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("w-verdict").textContent=a.apply_verdict||"—";$("w-conf").textContent=a.apply_confidence??"?";
+  $("w-str").innerHTML=(a.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("w-con").innerHTML=(a.concerns||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("m-advice").innerHTML=(a.advice||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  if(a.error)$("m-out").innerHTML='<div class="out">Scorer: '+esc(a.error)+'. Start the scorer sidecar or install resumehq.</div>';
+}
+function toggleWhy(){$("why").classList.toggle("hide");}
+async function addInfo(){const t=$("edit").value.trim();if(!t||!TID)return;
+  const r=await jpost("/api/action",{thread_id:TID,action:"add_info",text:t});$("edit").value="";
+  if(r.how_to_add){$("howto").classList.remove("hide");$("howto").innerHTML="<b>How to add this:</b><br>"+esc(r.how_to_add);}
+  renderMatch(r.ats);}
+$("refile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f||!TID)return;const fd=new FormData();fd.append("file",f);
+  const txt=(await (await fetch("/api/upload",{method:"POST",body:fd})).json()).resume_text||"";
+  renderMatch((await jpost("/api/action",{thread_id:TID,action:"upload_resume",resume_text:txt})).ats);});
+async function extra(act){$("m-out").innerHTML='<div class="mut">generating…</div>';
+  const r=await jpost("/api/action",{thread_id:TID,action:act});const v=(r.artifacts||{})[act];
+  const body=Array.isArray(v)?v.map((x,i)=>(i+1)+". "+x).join("\n"):(v||"(empty)");
+  $("m-out").innerHTML='<div class="out">'+esc(body)+'</div>';}
+
+async function loadRecommended(){
+  const r=await jget("/api/recommended"); const jobs=r.jobs||[];
+  if(!jobs.length)return; $("reccard").classList.remove("hide");
+  $("rec").innerHTML=jobs.slice(0,8).map(x=>`<div class="job" onclick="openJob('${x.id}')"><b>${esc(x.title)}</b> <span class="pill g">${x.score}% match</span><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div></div>`).join("");
+}
+async function loadMarket(){
+  const m=await jget("/api/market?domain=Data Science");
+  const max=Math.max(...m.top_skills.map(s=>s.count),1);
+  const skills=m.top_skills.slice(0,10).map(s=>`<div class="mrow"><span>${esc(s.skill)}</span><span>${s.count}</span></div>`).join("");
+  const comp=m.top_companies.slice(0,6).map(c=>`<div class="mrow"><span>${esc(c.name)}</span><span>${c.jobs}</span></div>`).join("");
+  const emg=(m.emerging_skills||[]).slice(0,6).map(e=>`<span class="pill ${e.change_pct>=0?'g':'b'}">${esc(e.skill)} ${e.change_pct>=0?'↑':'↓'}${Math.abs(e.change_pct)}%</span>`).join("")||'<span class="mut">n/a</span>';
+  const rem=m.remote_vs_onsite;
+  $("market").innerHTML=`<div class="grid"><div><h3>Most requested skills</h3>${skills}</div>
+    <div><h3>Top companies hiring</h3>${comp}
+    <h3>Remote vs onsite</h3><div class="mrow"><span>Remote</span><span>${rem.remote}</span></div><div class="mrow"><span>Onsite</span><span>${rem.onsite}</span></div>
+    <h3>Emerging (MoM)</h3>${emg}</div></div><div class="mut" style="margin-top:8px">${esc(m.note)}</div>`;
+}
+</script></body></html>
+<!-- <!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Job Scout · ATS Agent</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff;--good:#3fb06a;--bad:#e2554b;--amb:#e0a13c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 18px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:19px;margin:0}a{color:var(--acc);text-decoration:none}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.chip b{font-size:18px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+input,select,textarea{width:100%;background:#0d0f14;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 13px;font:inherit;font-weight:500;cursor:pointer}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.cbx{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:13px;color:var(--mut)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.job:hover{border-color:var(--acc)}.job.sel{border-color:var(--acc);background:#1b2130}
+.job .m{color:var(--mut);font-size:12px;margin-top:2px}
+.star{float:right;cursor:pointer;color:var(--mut);font-size:16px}.star.on{color:var(--amb)}
+.big{font-size:30px;font-weight:700}.unit{font-size:14px;color:var(--mut)}
+.bar{height:12px;border-radius:6px;background:#0d0f14;border:1px solid var(--line);overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;background:var(--acc)}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;margin:3px 5px 0 0;border:1px solid var(--line)}
+.pill.g{border-color:#2c5c3f;color:#8fe0ac}.pill.b{border-color:#5c2c2c;color:#f0a19b}
+h3{font-size:13px;margin:14px 0 4px;color:var(--mut)}
+.jd{white-space:pre-wrap;font-size:13px;max-height:280px;overflow:auto;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px}
+.out{white-space:pre-wrap;background:#0d0f14;border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;font-size:13px}
+.note{background:#1a1f14;border:1px solid #3a4a1e;border-radius:8px;padding:10px;margin-top:8px;font-size:13px}
+.verdict{font-size:22px;font-weight:700}.hide{display:none}.mut{color:var(--mut);font-size:13px}
+.mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--line)}
+</style></head><body><div class="wrap">
+<div class="top"><h1>Job Scout · ATS Agent</h1><div id="who"></div></div>
+<div class="chips hide" id="dash"></div>
+
+<div class="card">
+  <label>Your resume (paste or upload — used for AI match scoring)</label>
+  <textarea id="resume">Data scientist, 2 yrs. Skills: Python, SQL, Pandas, scikit-learn.</textarea>
+  <div class="row" style="margin-top:8px"><div style="flex:0"><input type="file" id="file" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+</div>
+
+<div class="card hide" id="reccard"><label>Recommended for you</label><div id="rec"></div></div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <label>Job Source</label>
+      <select id="source"><option>All Sources</option></select>
+      <div class="row" style="margin-top:10px">
+        <div><label>Skills (comma)</label><input id="f-skills" placeholder="python, sql"/></div>
+        <div><label>Location</label><input id="f-loc" placeholder="Bengaluru"/></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Min exp</label><input id="f-min" type="number" min="0"/></div>
+        <div><label>Max exp</label><input id="f-max" type="number" min="0"/></div>
+        <div><label>Domain</label><select id="f-domain"><option value="">Any</option></select></div>
+      </div>
+      <div class="cbx"><label style="margin:0"><input type="checkbox" id="f-remote" style="width:auto"/> Remote only</label></div>
+      <div style="margin-top:10px"><button onclick="searchJobs()">Search jobs</button>
+        <span class="mut" id="jstatus"></span></div>
+    </div>
+    <div class="card" id="listcard"><label>Results — click a job</label><div id="jobs"></div></div>
+  </div>
+
+  <div>
+    <div class="card hide" id="detail">
+      <div id="d-head"></div>
+      <h3>Job description</h3><div class="jd" id="d-jd"></div>
+      <div id="posmarket" class="mut" style="margin-top:10px"></div>
+      <div style="margin-top:10px"><button onclick="scoreJob()">AI match score against my resume</button></div>
+    </div>
+
+    <div class="card hide" id="match">
+      <div class="mut" id="m-job"></div>
+      <div class="big"><span id="m-score">–</span><span class="unit">/100 AI match</span></div>
+      <div class="bar"><i id="m-bar" style="width:0%"></i></div>
+      <h3>Matched skills</h3><div id="m-matched"></div>
+      <h3>Missing</h3><div id="m-missing"></div>
+      <button class="ghost" style="margin-top:10px" onclick="toggleWhy()">Why this score?</button>
+      <div class="hide" id="why">
+        <div class="note"><div class="mut">Should I apply?</div>
+          <span class="verdict" id="w-verdict">–</span> <span class="mut">— <span id="w-conf"></span>% confidence</span>
+          <h3>Why you're a match</h3><ul id="w-str" style="margin:0;padding-left:18px"></ul>
+          <h3>Potential concerns</h3><ul id="w-con" style="margin:0;padding-left:18px"></ul>
+        </div>
+      </div>
+      <h3>Actionable advice</h3><ul id="m-advice" style="margin:0;padding-left:18px"></ul>
+      <h3>Improve &amp; re-score</h3>
+      <div class="row"><div style="flex:3"><input id="edit" placeholder="Add experience, e.g. 'Deployed models on AWS'"/></div>
+        <div style="flex:0"><button onclick="addInfo()">Add &amp; re-score</button></div></div>
+      <div class="row" style="margin-top:6px"><div><label>…or upload a revised resume</label><input type="file" id="refile" accept=".txt,.md,.pdf,.docx" style="padding:6px"/></div></div>
+      <div class="note hide" id="howto"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="extra('cover_letter')">Cover letter</button>
+        <button class="ghost" onclick="extra('interview_questions')">Interview Qs</button>
+        <button class="ghost" onclick="extra('tailored_resume')">Tailored resume</button>
+      </div>
+      <div id="m-out"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="marketcard"><label>Job Market Intelligence</label><div id="market" class="mut">loading…</div></div>
+</div>
+<script>
+if(!localStorage.getItem("token")){location.href="/login";}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const tok=()=>localStorage.getItem("token");
+const authH=()=>tok()?{"Authorization":"Bearer "+tok()}:{};
+async function jget(u){const r=await fetch(u,{headers:authH()});return r.json();}
+async function jpost(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json",...authH()},body:JSON.stringify(b||{})});return r.json();}
+let TID=null,JOB=null,SEL=null;
+
+// header + dashboard
+(async function init(){
+  const u=localStorage.getItem("user");
+  $("who").innerHTML = u ? esc(JSON.parse(u).name||JSON.parse(u).email)+' · <a href="#" onclick="logout()">log out</a>' : '<a href="/login">Log in</a>';
+  if(tok()){const d=await jget("/api/dashboard");if(!d.detail){$("dash").classList.remove("hide");
+    $("dash").innerHTML=`<div class="chip"><b>${d.new_jobs}</b>Jobs</div><div class="chip"><b>${d.recommended}</b>Recommended</div><div class="chip"><b>${d.saved}</b>Saved</div><div class="chip"><b>${d.applied}</b>Applied</div><div class="chip"><b>${d.interviews}</b>Interviews</div>`;
+    $("dash").insertAdjacentHTML("afterbegin",`<div class="chip" style="border-color:var(--acc)">Welcome, <b style="display:inline">${esc(d.name)}</b></div>`);loadRecommended();}}
+  const f=await jget("/api/facets");
+  f.sources.forEach(s=>{if(s!=="All Sources")$("source").insertAdjacentHTML("beforeend",`<option>${esc(s)}</option>`);});
+  f.domains.forEach(d=>$("f-domain").insertAdjacentHTML("beforeend",`<option>${esc(d)}</option>`));
+  loadMarket(); searchJobs();
+})();
+function logout(){localStorage.clear();location.href="/";}
+
+$("file").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("file",f);
+  const r=await fetch("/api/upload",{method:"POST",body:fd});$("resume").value=(await r.json()).resume_text||"";});
+
+async function searchJobs(){
+  const p=new URLSearchParams();
+  if($("source").value!=="All Sources")p.set("source",$("source").value);
+  if($("f-skills").value)p.set("skills",$("f-skills").value);
+  if($("f-loc").value)p.set("location",$("f-loc").value);
+  if($("f-min").value)p.set("min_exp",$("f-min").value);
+  if($("f-max").value)p.set("max_exp",$("f-max").value);
+  if($("f-domain").value)p.set("domain",$("f-domain").value);
+  if($("f-remote").checked)p.set("remote","true");
+  p.set("limit","30");
+  $("jstatus").textContent="…";
+  const j=(await jget("/api/jobs?"+p)).jobs||[];
+  $("jstatus").textContent=j.length+" jobs";
+  $("jobs").innerHTML="";
+  j.forEach(x=>{const d=document.createElement("div");d.className="job";
+    const star=tok()?`<span class="star" title="Save" onclick="event.stopPropagation();saveJob('${x.id}',this)">★</span>`:"";
+    d.innerHTML=`${star}<b>${esc(x.title)}</b><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div>`;
+    d.onclick=()=>openJob(x.id,d);$("jobs").appendChild(d);});
+}
+async function saveJob(id,el){const r=await jpost("/api/jobs/"+id+"/save");if(!r.detail){el.classList.add("on");}}
+
+async function openJob(id,el){el=el||null;
+  document.querySelectorAll(".job").forEach(x=>x.classList.remove("sel"));if(el)el.classList.add("sel");
+  const j=await jget("/api/jobs/"+id);JOB=j;SEL=id;
+  $("detail").classList.remove("hide");$("match").classList.add("hide");
+  $("d-head").innerHTML=`<b style="font-size:16px">${esc(j.title)}</b><div class="mut">${esc(j.company)} · ${esc(j.location)} · ${esc(j.source)}${j.remote?" · Remote":""}${j.apply_link?` · <a href="${esc(j.apply_link)}" target="_blank">apply ↗</a>`:""}</div>`;
+  $("d-jd").textContent=j.description||"(no description)";
+  jget("/api/market/position/"+id).then(pm=>{
+    if(pm.error){$("posmarket").innerHTML="";return;}
+    const top=(pm.top_skills||[]).slice(0,8).map(x=>`<span class="pill">${esc(x.skill)} · ${x.count}</span>`).join("");
+    $("posmarket").innerHTML=`<b>Most requested skills for "${esc(pm.position)}"</b> <span class="mut">(${pm.postings} similar postings)</span><br>${top}`;
+  });
+  $("detail").scrollIntoView({behavior:"smooth"});
+}
+
+async function scoreJob(){
+  if(!SEL)return;
+  $("match").classList.remove("hide");$("m-score").textContent="…";$("m-bar").style.width="0%";$("m-out").innerHTML="";$("why").classList.add("hide");$("howto").classList.add("hide");
+  const s=await jpost("/api/start",{resume_text:$("resume").value,domain:JOB.domain||null});
+  if(s.detail){$("m-out").innerHTML='<div class="out">'+esc(s.detail)+'</div>';return;}
+  TID=s.thread_id;
+  const r=await jpost("/api/select",{thread_id:TID,job_id:SEL});
+  renderMatch(r.ats);
+}
+function renderMatch(a){
+  if(!a){return;}
+  $("match").classList.remove("hide");
+  $("m-job").textContent=a.job_title+" · "+a.company;
+  const sc=a.ats_score==null?0:a.ats_score;
+  $("m-score").textContent=a.ats_score==null?"n/a":a.ats_score;$("m-bar").style.width=sc+"%";
+  $("m-matched").innerHTML=(a._raw?.matched_keywords||[]).slice(0,12).map(k=>`<span class="pill g">✓ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("m-missing").innerHTML=(a._raw?.missing_keywords||[]).slice(0,12).map(k=>`<span class="pill b">⚠ ${esc(k)}</span>`).join("")||'<span class="mut">—</span>';
+  $("w-verdict").textContent=a.apply_verdict||"—";$("w-conf").textContent=a.apply_confidence??"?";
+  $("w-str").innerHTML=(a.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("w-con").innerHTML=(a.concerns||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  $("m-advice").innerHTML=(a.advice||[]).map(s=>`<li>${esc(s)}</li>`).join("")||"<li class='mut'>—</li>";
+  if(a.error)$("m-out").innerHTML='<div class="out">Scorer: '+esc(a.error)+'. Start the scorer sidecar or install resumehq.</div>';
+}
+function toggleWhy(){$("why").classList.toggle("hide");}
+async function addInfo(){const t=$("edit").value.trim();if(!t||!TID)return;
+  const r=await jpost("/api/action",{thread_id:TID,action:"add_info",text:t});$("edit").value="";
+  if(r.how_to_add){$("howto").classList.remove("hide");$("howto").innerHTML="<b>How to add this:</b><br>"+esc(r.how_to_add);}
+  renderMatch(r.ats);}
+$("refile").addEventListener("change",async e=>{const f=e.target.files[0];if(!f||!TID)return;const fd=new FormData();fd.append("file",f);
+  const txt=(await (await fetch("/api/upload",{method:"POST",body:fd})).json()).resume_text||"";
+  renderMatch((await jpost("/api/action",{thread_id:TID,action:"upload_resume",resume_text:txt})).ats);});
+async function extra(act){$("m-out").innerHTML='<div class="mut">generating…</div>';
+  const r=await jpost("/api/action",{thread_id:TID,action:act});const v=(r.artifacts||{})[act];
+  const body=Array.isArray(v)?v.map((x,i)=>(i+1)+". "+x).join("\n"):(v||"(empty)");
+  $("m-out").innerHTML='<div class="out">'+esc(body)+'</div>';}
+
+async function loadRecommended(){
+  const r=await jget("/api/recommended"); const jobs=r.jobs||[];
+  if(!jobs.length)return; $("reccard").classList.remove("hide");
+  $("rec").innerHTML=jobs.slice(0,8).map(x=>`<div class="job" onclick="openJob('${x.id}')"><b>${esc(x.title)}</b> <span class="pill g">${x.score}% match</span><div class="m">${esc(x.company)} · ${esc(x.location)} · ${esc(x.source)}${x.remote?" · Remote":""}</div></div>`).join("");
+}
+async function loadMarket(){
+  const m=await jget("/api/market?domain=Data Science");
+  const max=Math.max(...m.top_skills.map(s=>s.count),1);
+  const skills=m.top_skills.slice(0,10).map(s=>`<div class="mrow"><span>${esc(s.skill)}</span><span>${s.count}</span></div>`).join("");
+  const comp=m.top_companies.slice(0,6).map(c=>`<div class="mrow"><span>${esc(c.name)}</span><span>${c.jobs}</span></div>`).join("");
+  const emg=(m.emerging_skills||[]).slice(0,6).map(e=>`<span class="pill ${e.change_pct>=0?'g':'b'}">${esc(e.skill)} ${e.change_pct>=0?'↑':'↓'}${Math.abs(e.change_pct)}%</span>`).join("")||'<span class="mut">n/a</span>';
+  const rem=m.remote_vs_onsite;
+  $("market").innerHTML=`<div class="grid"><div><h3>Most requested skills</h3>${skills}</div>
+    <div><h3>Top companies hiring</h3>${comp}
+    <h3>Remote vs onsite</h3><div class="mrow"><span>Remote</span><span>${rem.remote}</span></div><div class="mrow"><span>Onsite</span><span>${rem.onsite}</span></div>
+    <h3>Emerging (MoM)</h3>${emg}</div></div><div class="mut" style="margin-top:8px">${esc(m.note)}</div>`;
+}
+</script></body></html> --> --> -->

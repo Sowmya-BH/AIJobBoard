@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sign in · Job Scout</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ec;--mut:#9aa3b2;--acc:#5b8cff;--bad:#e2554b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;width:360px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin-bottom:18px}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 5px}
+input{width:100%;background:#0d0f14;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit}
+button{width:100%;margin-top:16px;background:var(--acc);color:#fff;border:0;border-radius:8px;padding:11px;font:inherit;font-weight:600;cursor:pointer}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tab{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px;color:var(--mut)}
+.tab.on{color:var(--fg);border-color:var(--acc)}
+.oauth{display:flex;gap:8px;margin-top:12px}.oauth button{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px}
+.tag{color:var(--mut);font-size:12px;text-align:center;margin-top:14px}
+</style></head><body>
+<div class="card">
+  <h1>Job Scout</h1><div class="sub">Sign in to save jobs and track applications.</div>
+  <div class="tabs"><div class="tab on" id="t-login" onclick="mode('login')">Log in</div>
+    <div class="tab" id="t-reg" onclick="mode('register')">Register</div></div>
+  <div id="name-wrap" style="display:none"><label>Name</label><input id="name"/></div>
+  <label>Email</label><input id="email" type="email"/>
+  <label>Password</label><input id="password" type="password"/>
+  <button id="go" onclick="submit()">Log in</button>
+  <div class="err" id="err"></div>
+  <div class="tag"><a href="/" style="color:var(--mut)">← back</a> · Admin: admin@local / admin12345</div>
+</div>
+<script>
+window.addEventListener("DOMContentLoaded",()=>{if(M==="register")mode("register");});
+let M = location.hash==="#register" ? "register" : "login";
+const $=id=>document.getElementById(id);
+function mode(m){M=m;$("t-login").classList.toggle("on",m==="login");$("t-reg").classList.toggle("on",m==="register");
+  $("name-wrap").style.display=m==="register"?"block":"none";$("go").textContent=m==="register"?"Create account":"Log in";$("err").textContent="";}
+async function submit(){
+  const body={email:$("email").value.trim(),password:$("password").value};
+  if(M==="register")body.name=$("name").value.trim();
+  const r=await fetch("/api/auth/"+M,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!r.ok){$("err").textContent=j.detail||"Failed";return;}
+  localStorage.setItem("token",j.token);localStorage.setItem("user",JSON.stringify(j.user));
+  location.href="/app";
+}
+</script></body></html>
