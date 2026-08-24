@@ -37,6 +37,32 @@ Parallelism is real: `scout` and `parser` have no data dependency, so they run i
 same LangGraph super-step; `match` fans them in. The two `interrupt()` points are the
 HITL gates — the CLI resumes them with `Command(resume=...)`.
 
+## 🏗️ System Architecture
+
+The project follows a **Decoupled Sidecar Architecture** to navigate the memory constraints of cloud free-tiers:
+
+* **Main Application (Render):** A lightweight, "torch-free" Python environment. It handles the LangGraph state machine, job retrieval from the 57k SQLite index, and user authentication.
+* **Scorer Sidecar (HF Spaces):** A high-memory environment (Gradio + ZeroGPU) that loads the heavy SBERT models and PyTorch. The Main App communicates with this sidecar over a strict HTTP tool boundary (`rq_tools.py`).
+
+---
+
+## 🔄 Graph Flow & Execution:
+[Start] ──> (Scout & Parser) ──> [Match Join] ──> [Interrupt: Select Job] ──> [ATS Score ↔ Human Review]
+* **Nodes:** `scout` and `parser` run in a parallel super-step.
+* **Join:** `match` aggregates the retrieved job data and parsed resume state.
+* **Interrupt:** `select_job` pauses execution for interactive user input.
+* **Loop:** `ats_score` $\leftrightarrow$ `human_review` allows iterative resume refinement and real-time score updates.
+
+---
+
+## 🧠 Core AI Components
+
+* **Resume Parser:** Uses **Google Gemini** to transform unstructured text into a structured JSON profile (skills, experience, seniority). It uses a precise parser system prompt to ensure high data integrity.
+* **Semantic Scorer:** Instead of counting keywords, the sidecar creates vector embeddings of the resume and job description using **SBERT**. It calculates a cosine similarity score weighted against "Required" vs. "Nice-to-have" skills:
+  $$\text{Score} = \cos(\theta) = \frac{\mathbf{v}_{\text{resume}} \cdot \mathbf{v}_{\text{job}}}{\|\mathbf{v}_{\text{resume}}\| \|\mathbf{v}_{\text{job}}\|}$$
+* **Grounded Generation:** When generating cover letters or interview questions, the agent is strictly constrained to the provided resume text and job description to prevent hallucinated qualifications.
+
+
 ## 💻 Technology Stack
 
 | Category | Tools |
@@ -50,6 +76,7 @@ HITL gates — the CLI resumes them with `Command(resume=...)`.
 | **Deployment / Infra** | Render (Web App), Hugging Face Spaces (Gradio Scorer), Docker |
 
 ## Run the web app (front end + backend):
+
 # 🚀 Live Deployment
 
 | Service | Status | URL |
