@@ -42,7 +42,15 @@ HITL gates — the CLI resumes them with `Command(resume=...)`.
 The project follows a **Decoupled Sidecar Architecture** to navigate the memory constraints of cloud free-tiers:
 
 * **Main Application (Render):** A lightweight, "torch-free" Python environment. It handles the LangGraph state machine, job retrieval from the 57k SQLite index, and user authentication.
-* **Scorer Sidecar (HF Spaces):** A high-memory environment (Gradio + ZeroGPU) that loads the heavy SBERT models and PyTorch. The Main App communicates with this sidecar over a strict HTTP tool boundary (`rq_tools.py`).
+* **Scorer Sidecar (HF Spaces):** A high-memory environment (Gradio + ZeroGPU) that loads the heavy SBERT models and PyTorch - calls strict tools from **ResumeHQ**. The Main App communicates with this sidecar over a strict HTTP tool boundary (`rq_tools.py`).
+
+# 🧠 Deep Dive: What is ResumeHQ?
+
+Unlike traditional ATS systems that look for exact keyword matches, this agent uses **ResumeHQ Semantic Scoring**:
+
+* **Vector Embeddings:** Converts the full résumé and job description into high-dimensional vectors using SBERT.
+* **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
+* **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
 
 ---
 
@@ -106,15 +114,6 @@ The application is split into two specialized environments to optimize performan
 The Render app acts as the orchestrator. When a user selects a job, the app sends an internal HTTP request to the Hugging Face Scorer via the `RQ_SCORER_URL`. This **Sidecar architecture** prevents the main web app from crashing due to high memory demands of ML models (OOM errors).
 
 ---
-
-# 🧠 Deep Dive: What is ResumeHQ?
-
-Unlike traditional ATS systems that look for exact keyword matches, this agent uses **ResumeHQ Semantic Scoring**:
-
-* **Vector Embeddings:** Converts the full résumé and job description into high-dimensional vectors using SBERT.
-* **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
-* **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
-
 
 
 # 🛠️ Setup & Run Instructions
