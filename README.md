@@ -55,7 +55,7 @@ The project follows a **Decoupled Sidecar Architecture** to navigate the memory 
 
 ---
 
-## 🧠 Core AI Components
+## ⚙️ Core AI Components
 
 * **Resume Parser:** Uses **Google Gemini** to transform unstructured text into a structured JSON profile (skills, experience, seniority). It uses a precise parser system prompt to ensure high data integrity.
 * **Semantic Scorer:** Instead of counting keywords, the sidecar creates vector embeddings of the resume and job description using **SBERT**. It calculates a cosine similarity score weighted against "Required" vs. "Nice-to-have" skills:
