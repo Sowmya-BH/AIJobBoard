@@ -37,6 +37,18 @@ Parallelism is real: `scout` and `parser` have no data dependency, so they run i
 same LangGraph super-step; `match` fans them in. The two `interrupt()` points are the
 HITL gates — the CLI resumes them with `Command(resume=...)`.
 
+## 💻 Technology Stack
+
+| Category | Tools |
+| :--- | :--- |
+| **Agent Orchestration** | LangGraph, LangChain |
+| **Large Language Models** | Google Gemini (1.5 Flash), OpenAI/Anthropic (via BYO keys) |
+| **Embedding / Scoring** | ResumeHQ, SBERT (Sentence-Transformers), PyTorch |
+| **Backend Framework** | FastAPI, Uvicorn |
+| **Database / Persistence** | SQLite (Jobs/Dev), PostgreSQL (Production Users), MemorySaver |
+| **Observability** | LangSmith |
+| **Deployment / Infra** | Render (Web App), Hugging Face Spaces (Gradio Scorer), Docker |
+
 ## Run the web app (front end + backend):
 # 🚀 Live Deployment
 
