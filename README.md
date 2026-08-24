@@ -64,7 +64,7 @@ Unlike traditional ATS systems that look for exact keyword matches, this agent u
 * **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
 * **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
 
-```You can also run it locally on your computer in your bash terminal
+```## Run the CLI instead
 pip install -r requirements.txt
 export GEMINI_API_KEY=...                  # optional; stubs used if unset
 export JOBS_INDEX=data/jobs_index.jsonl    # full 57k; omit for the 3k sample
@@ -81,7 +81,7 @@ talks to three FastAPI endpoints that map onto the graph's two interrupts:
 `/api/start` (→ select_job interrupt), `/api/select` (→ review interrupt),
 `/api/action` (add_info re-score / ask / generate / done).
 
-## Run the CLI instead
+### Run the CLI 
 
 ```bash
 python run.py --resume my_resume.pdf --domain "Data Science"
