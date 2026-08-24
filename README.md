@@ -359,9 +359,7 @@ the final resume.
 
 ## Deploy on Render
 
-Render doesn't read `docker-compose.yml` — it deploys each service from its own
-Dockerfile, wired by `render.yaml` (included). The compose file is kept for
-LOCAL dev only.
+
 
 `render.yaml` defines two services that match the memory split:
 
@@ -370,10 +368,10 @@ LOCAL dev only.
 | `job-scout-app` | `web` | free (512 MB) | no | yes |
 | `resumehq-scorer` | `pserv` (private) | paid (~2 GB) | yes | no (internal only) |
 
-Deploy: push this repo to GitHub → Render → **New → Blueprint** → pick the repo.
+Render → **New → Blueprint** → pick the repo.
 Render builds both, and injects the scorer's internal `host:port` into the app's
 `RQ_SCORER_URL` (rq_tools adds the `http://`). Set `GEMINI_API_KEY` (app) and
-optional `ANTHROPIC_API_KEY` (scorer, for cover letters) in the dashboard.
+optional user api_key (for cover letters, interview) uploaded by the user in the dashboard.
 
 **Feasibility, stated plainly:** you cannot run everything on one free 512 MB
 Render service — torch+SBERT alone exceed it and Render will OOM-kill the
