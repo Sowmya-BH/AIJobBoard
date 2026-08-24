@@ -82,7 +82,8 @@ Unlike traditional ATS systems that look for exact keyword matches, this agent u
 | **Observability** | LangSmith |
 | **Deployment / Infra** | Render (Web App), Hugging Face Spaces (Gradio Scorer), Docker |
 
-## Run the web app (front end + backend):
+## Run the web app (front end + backend): 
+The application supports both a browser-based UI and an interactive CLI. In the browser,
 
 # 🚀 Live Deployment
 
