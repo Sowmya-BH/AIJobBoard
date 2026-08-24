@@ -1,9 +1,14 @@
-# Virtual environment
+# Keep the app image small & correct.
+.git/
 myenv/
 venv/
 .venv/
-
-# Python cache
 __pycache__/
-*.pycmyenv/
-myenv/
+*.py[cod]
+.env
+.env.*
+*.log
+jobdata/                 # the 377MB source JSON — never needed in the image
+scorer_service/          # the scorer is a SEPARATE image
+data/users.db            # mutable user DB (Postgres in prod)
+# data/app_sample.db is intentionally NOT ignored — the app needs it.

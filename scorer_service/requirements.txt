@@ -1,0 +1,6 @@
+gradio
+spaces
+resumehq
+sentence-transformers
+torch
+nltk
