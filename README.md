@@ -417,3 +417,11 @@ explanations and (when a key is set) splits each job's skills into **required vs
 nice-to-have** so short postings don't inflate to 100%. Postings with <3 listed
 skills are marked `low` confidence and discounted. Verified: a 4-required-skill job
 scores 50 with 2 hits, then 100 after the user adds the 4 missing skills via HITL.
+
+
+## ⚠️ Known Limitations & Trade-offs
+
+* **Memory Constraints:** The main application is strictly "torch-free." Attempting to run ResumeHQ's local engine within the Render Free Tier (512MB) will trigger an OOM (Out of Memory) crash.
+* **SQLite Persistence:** SQLite writes on Render are ephemeral. For production deployment, you must configure `DATABASE_URL` to point to the included PostgreSQL blueprint.
+* **Cold Starts:** The HF Scorer sidecar may go to sleep on free tiers. The main application includes a timeout and audit log to track and report these connectivity gaps.
+* **Rate Limits:** The system relies heavily on model API rate limits via the user interface. High-frequency re-scoring within the HITL loop may hit free-tier quotas.
