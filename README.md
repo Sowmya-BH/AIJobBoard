@@ -64,10 +64,7 @@ Unlike traditional ATS systems that look for exact keyword matches, this agent u
 * **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
 * **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
 
-## Run the CLI instead:
-server:app: Runs the main application module (Web UI + LangGraph state machine). It handles semantic scoring either by importing ResumeHQ in-process or by executing an HTTP call to the sidecar service.
 
-app:app (inside scorer_service/): Runs the standalone local scorer module that hosts the dedicated scoring service.
 
 # 🛠️ Running the Application
 
@@ -89,6 +86,10 @@ export JOBS_INDEX=data/jobs_index.jsonl    # full 57k; omit for the 3k sample
 uvicorn server:app --reload
 ```
 
+* server:app: Runs the main application module (Web UI + LangGraph state machine). It handles semantic scoring either by importing ResumeHQ in-process or by executing an HTTP call to the sidecar service.
+
+* app:app (inside scorer_service/): Runs the standalone local scorer module that hosts the dedicated scoring service.
+  
 Then open **http://127.0.0.1:8000** — paste or upload a resume, pick a domain,
 click *Find matching jobs*, select a job, review the ATS score, add info to
 re-score, and generate a cover letter / tailored resume / interview questions.
