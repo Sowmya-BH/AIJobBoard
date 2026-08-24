@@ -65,9 +65,22 @@ Unlike traditional ATS systems that look for exact keyword matches, this agent u
 * **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
 
 ## Run the CLI instead:
-Which module you run
-server:app → the app (web UI + LangGraph). It only scores by either importing ResumeHQ in-process or calling the sidecar.
-app:app from inside scorer_service/ → the actual local scorer.
+server:app: Runs the main application module (Web UI + LangGraph state machine). It handles semantic scoring either by importing ResumeHQ in-process or by executing an HTTP call to the sidecar service.
+
+app:app (inside scorer_service/): Runs the standalone local scorer module that hosts the dedicated scoring service.
+
+# 🛠️ Running the Application
+
+To run the complete system locally, execute the following commands in separate terminal sessions:
+
+* **Terminal 1 — AI Scoring Engine (Sidecar)**  
+  Starts the heavy GPU/ML sidecar service on port 8100:
+  ```bash
+  cd scorer_service && uvicorn app:app --port 8100
+* **Terminal 2 — Main Web Application**  
+export RQ_SCORER_URL=http://localhost:8100
+uvicorn server:app --port 8000
+
 ```## Run the CLI instead
 pip install -r requirements.txt
 export GEMINI_API_KEY=...                  # optional; stubs used if unset
