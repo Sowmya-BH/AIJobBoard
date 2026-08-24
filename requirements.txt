@@ -1,6 +1,6 @@
 # App runtime — cloud-safe (no torch). ResumeHQ installed separately per profile.
 langgraph>=0.2.50
-langsmith
+langsmith>=0.3.0
 fastmcp>=3.0.0
 google-generativeai>=0.8.0
 fastapi>=0.110.0
