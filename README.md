@@ -25,9 +25,46 @@ Parallelism is real: `scout` and `parser` have no data dependency, so they run i
 same LangGraph super-step; `match` fans them in. The two `interrupt()` points are the
 HITL gates — the CLI resumes them with `Command(resume=...)`.
 
-## Run the web app (front end + backend)
+## Run the web app (front end + backend):
+# 🚀 Live Deployment
 
-```bash
+| Service | Status | URL |
+| :--- | :--- | :--- |
+| **Main Web App** | 🟢 Live on Render | [aijobboard-o52o.onrender.com](https://aijobboard-o52o.onrender.com) |
+| **AI Scoring Engine** | ⚡ HF Space (Gradio) | [rajuiscoding-resume-parser.hf.space](https://rajuiscoding-resume-parser.hf.space) |
+| **Observability** | 📊 Tracing Enabled | LangSmith Dashboard |
+
+---
+
+# 🏗 Architecture & Deployment
+
+The application is split into two specialized environments to optimize performance and stay within free-tier resource limits:
+
+### Main Application (Render)
+* **Runtime:** Native Python (Non-Docker) to minimize overhead.
+* **Stack:** FastAPI + LangGraph + SQLite.
+* **Memory:** Optimized to run under 200MB, fitting easily within Render's 512MB free limit.
+* **Responsibility:** Handles user authentication (`bcrypt`), job scouting (57k index), and the LangGraph state machine.
+
+### Semantic Scorer Sidecar (Hugging Face Spaces)
+* **Runtime:** Gradio + ZeroGPU.
+* **Stack:** SBERT (Sentence-Transformers) + PyTorch.
+* **Responsibility:** Performs the heavy lifting of ResumeHQ scoring. It uses GPU-accelerated embeddings to compare the semantic meaning of a resume against a job description.
+
+### How They Communicate
+The Render app acts as the orchestrator. When a user selects a job, the app sends an internal HTTP request to the Hugging Face Scorer via the `RQ_SCORER_URL`. This **Sidecar architecture** prevents the main web app from crashing due to high memory demands of ML models (OOM errors).
+
+---
+
+# 🧠 Deep Dive: What is ResumeHQ?
+
+Unlike traditional ATS systems that look for exact keyword matches, this agent uses **ResumeHQ Semantic Scoring**:
+
+* **Vector Embeddings:** Converts the full résumé and job description into high-dimensional vectors using SBERT.
+* **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
+* **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
+
+```You can also run it locally on your computer in your bash terminal
 pip install -r requirements.txt
 export GEMINI_API_KEY=...                  # optional; stubs used if unset
 export JOBS_INDEX=data/jobs_index.jsonl    # full 57k; omit for the 3k sample
