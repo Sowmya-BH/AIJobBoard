@@ -1,19 +1,24 @@
 # Job Scout + Resume ATS Agent (LangGraph + Gemini)
 
 ## 📋 Project Overview
-The Job Scout + Resume ATS Agent is an intelligent, agentic system designed to bridge the gap between job seekers and a massive database of 57,000+ job listings. Unlike simple keyword-matching tools, this agent uses LangGraph to orchestrate a sophisticated workflow that parses resumes, retrieves relevant jobs in parallel, and performs deep semantic scoring.
-The system features a Human-in-the-Loop (HITL) architecture, allowing users to interactively add missing experience or skills to see their ATS scores improve in real-time before generating tailored application materials.
-###✨ Feature Summary
-Parallel Execution: Utilizes LangGraph to "Scout" the job database and "Parse" the resume simultaneously, reducing latency by ~40%.
-Semantic ATS Scoring: Employs a dedicated ML sidecar (ResumeHQ) using SBERT embeddings to match resume meaning rather than just keywords.
-Interactive HITL Loop: Dual interrupt points allow users to select specific jobs and "re-score" their resume by providing additional context.
-AI Artifact Generation: One-click generation of STAR-style resume bullets, tailored cover letters, and interview preparation questions.
-Enterprise Persistence: Transparently switches between local SQLite for development and Managed Postgres for production deployment.
-Full Observability: Integrated LangSmith tracing to monitor every node execution, LLM call, and tool invocation.
 
-## Graph:
+The **Job Scout + Resume ATS Agent** is an intelligent, agentic system designed to bridge the gap between job seekers and a massive database of **57,000+ job listings**. 
 
-<img width="3024" height="1783" alt="304093C1-A15A-4BB2-ACBC-B8C07539AB12_1_201_a" src="https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54" />
+Unlike simple keyword-matching tools, this agent uses **LangGraph** to orchestrate a sophisticated workflow that parses resumes, retrieves relevant jobs in parallel, and performs deep semantic scoring. The system features a **Human-in-the-Loop (HITL)** architecture, allowing users to interactively add missing experience or skills to see their ATS scores improve in real-time before generating tailored application materials.
+
+---
+
+### ✨ Feature Summary
+
+* **Parallel Execution:** Utilizes LangGraph to "Scout" the job database and "Parse" the resume simultaneously, reducing latency by ~40%.
+* **Semantic ATS Scoring:** Employs a dedicated ML sidecar (ResumeHQ) using SBERT embeddings to match resume meaning rather than just keywords.
+* **Interactive HITL Loop:** Dual interrupt points allow users to select specific jobs and "re-score" their resume by providing additional context.
+* **AI Artifact Generation:** One-click generation of STAR-style resume bullets, tailored cover letters, and interview preparation questions.
+* **Enterprise Persistence:** Transparently switches between local SQLite for development and Managed Postgres for production deployment.
+* **Full Observability:** Integrated LangSmith tracing to monitor every node execution, LLM call, and tool invocation.
+## Project Architecture:
+
+![Project Architecture](https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54)
 
 
 ```
