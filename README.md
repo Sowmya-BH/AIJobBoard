@@ -117,7 +117,7 @@ Unlike traditional ATS systems that look for exact keyword matches, this agent u
 
 
 
-# 🛠️ Running the Application
+# 🛠️ Setup & Run Instructions
 
 To run the complete system locally, execute the following commands in separate terminal sessions:
 
