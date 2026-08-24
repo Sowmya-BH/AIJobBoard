@@ -18,8 +18,6 @@ Unlike simple keyword-matching tools, this agent uses **LangGraph** to orchestra
 * **Full Observability:** Integrated LangSmith tracing to monitor every node execution, LLM call, and tool invocation.
 ## Project Architecture:
 
-![Project Architecture](https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54)
-
 <img src="https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54" alt="Project Architecture" width="100%" />
 
 ```
