@@ -64,7 +64,10 @@ Unlike traditional ATS systems that look for exact keyword matches, this agent u
 * **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
 * **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
 
-## Run the CLI instead
+## Run the CLI instead:
+Which module you run
+server:app → the app (web UI + LangGraph). It only scores by either importing ResumeHQ in-process or calling the sidecar.
+app:app from inside scorer_service/ → the actual local scorer.
 ```## Run the CLI instead
 pip install -r requirements.txt
 export GEMINI_API_KEY=...                  # optional; stubs used if unset
