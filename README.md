@@ -18,6 +18,9 @@ Unlike simple keyword-matching tools, this agent uses ResumeHQ for Semantic Scor
 * **Enterprise Persistence:** Transparently switches between local SQLite for development and Managed Postgres for production deployment.
 * **Full Observability:** Integrated LangSmith tracing to monitor every node execution, LLM call, and tool invocation.
 ## Project Architecture:
+
+![Project Architecture](https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54) 
+
 #### HTML Image: <img src="https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54" alt="Project Architecture" width="100%" />
 
 ```
