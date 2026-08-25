@@ -1,7 +1,7 @@
 # Job Scout + Resume ATS Agent (LangGraph + Gemini)
 
 ## 📋 Project Overview
-An enterprise-grade, human-in-the-loop (HITL) job scouting and resume tailoring application powered by **LangGraph, Gemini, and ResumeHQ** is an intelligent, agentic system designed to bridge the gap between job seekers and a massive database of **57,000+ job listings**. It is an end-to-end AI decision-support workflow:
+An enterprise-grade, human-in-the-loop (HITL) job scouting and resume tailoring application powered by **LangGraph, Gemini, and ResumeHQ** is an intelligent, agentic system designed to bridge the gap between job seekers and a massive database of **57,000+ job listings**. It is an end-to-end AI decision-support user workflow:
 
 **Discover → Rank → Evaluate → Explain → Human Review → Improve → Re-evaluate → Generate → Apply**
 
