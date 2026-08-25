@@ -425,3 +425,7 @@ scores 50 with 2 hits, then 100 after the user adds the 4 missing skills via HIT
 * **SQLite Persistence:** SQLite writes on Render are ephemeral. For production deployment, you must configure `DATABASE_URL` to point to the included PostgreSQL blueprint.
 * **Cold Starts:** The HF Scorer sidecar may go to sleep on free tiers. The main application includes a timeout and audit log to track and report these connectivity gaps.
 * **Rate Limits:** The system relies heavily on model API rate limits via the user interface. High-frequency re-scoring within the HITL loop may hit free-tier quotas.
+
+
+Here is the video explanation for my project:
+https://drive.google.com/file/d/1on3REbJvE-_M6evvakLq80P4mTQi3jUz/view?usp=sharing 
