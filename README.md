@@ -434,3 +434,5 @@ https://drive.google.com/file/d/1on3REbJvE-_M6evvakLq80P4mTQi3jUz/view?usp=shari
 When you enter your key in the Settings tab, the agent attempts a lightweight `GET` request to the provider's models list. If successful, you will see the confirmation screen shown below:
 
 ![Settings Validation Screen](<img width="3024" height="1964" alt="314FC9F0-AD99-4BF6-8F21-4C7E0FDA0108" src="https://github.com/user-attachments/assets/b820e0c9-1b18-4e65-a82f-2b4c0810f5d6" />)
+![Uploading 314FC9F0-AD99-4BF6-8F21-4C7E0FDA0108.jpeg…]()
+
