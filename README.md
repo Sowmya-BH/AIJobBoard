@@ -19,7 +19,7 @@ Built to run **production-grade on free tiers**: the web app fits inside a
 ---
 
 
-
+### 🌐 Live Deployments
 > 🚀 **Web Application (Render):**  
 > **[https://aijobboard-o52o.onrender.com](https://aijobboard-o52o.onrender.com)**  
 >
@@ -27,14 +27,6 @@ Built to run **production-grade on free tiers**: the web app fits inside a
 > **[https://rajuiscoding-resume-parser.hf.space](https://rajuiscoding-resume-parser.hf.space)**
 > 
 > 📊 **Observability Tracing Enabled	LangSmith Dashboard.**
-
----
-
-
-**Live:** 
- 
-scorer on Hugging Face Spaces :https://rajuiscoding-resume-parser.hf.space
-app on Render -- https://aijobboard-o52o.onrender.com
 
 ---
 
