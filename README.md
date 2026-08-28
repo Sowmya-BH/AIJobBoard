@@ -18,15 +18,6 @@ Built to run **production-grade on free tiers**: the web app fits inside a
 
 ---
 
-### 🌐 Live Deployments
-
-Run the web app (front end + backend):
-The application supports both a browser-based UI and an interactive CLI. In the browser,
-🚀 Live Deployment
-Service	Status	URL
-Main Web App	🟢 Live on Render	aijobboard-o52o.onrender.com
-AI Scoring Engine	⚡ HF Space (Gradio)	rajuiscoding-resume-parser.hf.space
-Observability	📊 Tracing Enabled	LangSmith Dashboard
 
 
 > 🚀 **Web Application (Render):**  
