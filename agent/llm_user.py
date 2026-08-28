@@ -3,7 +3,7 @@ import urllib.request
 import urllib.error
 import os
 
-from google import genai 
+
 
 PROVIDERS = ("openai", "anthropic", "gemini", "groq", "custom", "test")
 GROQ_BASE = "https://api.groq.com/openai/v1"
