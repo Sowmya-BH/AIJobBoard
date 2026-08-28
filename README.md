@@ -33,6 +33,12 @@ SBERT/torch scorer) to external services.
 
 ## Architecture
 
+<img width="2014" height="1816" alt="1E19A70B-6385-458F-B7A2-91C899F62213" src="https://github.com/user-attachments/assets/80c020db-4a07-4432-b3b4-0e30cf4b19b5" />
+
+
+
+
+
 ```
                       Browser (SPA)
                            |  JWT
