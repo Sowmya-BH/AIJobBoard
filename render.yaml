@@ -1,37 +1,38 @@
-# App-ONLY Blueprint. The ResumeHQ/SBERT scorer lives on a Hugging Face Space,
-# NOT here — so nothing in this deploy installs torch/resumehq/gradio.
-#
-# runtime: python  => Render installs ONLY root requirements.txt (light) and
-# ignores every Dockerfile in the repo, including scorer_service/Dockerfile.
-# The scorer_service/ and jobdata/ folders are just inert files in the repo.
+# App-only Blueprint. ONE external database: MongoDB Atlas (jobs + users).
+# Nothing (no JSON, no SQLite) is shipped in the image, so cold starts are fast
+# and the app stays well under 512MB. runtime: python => installs only
+# requirements.txt and ignores any Dockerfile.
 
 services:
 - type: web
   name: job-scout-app
-  runtime: python                 # NOT docker -> can't build the scorer image
-  plan: free                      # 512MB is enough; app is torch-free
+  runtime: python
+  plan: free
   buildCommand: pip install -r requirements.txt
-  startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT   # $PORT, not 8000
+  startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
   healthCheckPath: /
   envVars:
-  - key: APP_DB
-    value: data/app_sample.db     # read-only jobs DB committed to the repo
-  - key: DATABASE_URL
-    fromDatabase: { name: jobscout-db, property: connectionString }
+  - key: MONGODB_URI            # mongodb+srv://... from Atlas (jobs + users)
+    sync: false
+  - key: MONGODB_DB
+    value: jobscout
   - key: JWT_SECRET
     generateValue: true
-  - key: APP_ENCRYPTION_KEY
+  - key: APP_ENCRYPTION_KEY     # encrypts stored user API keys (Fernet)
     generateValue: true
-  # --- scorer is remote (HF Gradio Space) ---
+  # --- scorer on Hugging Face (Gradio/ZeroGPU) ---
   - key: RQ_SCORER_KIND
     value: gradio
   - key: RQ_SCORER_URL
-    sync: false                   # set to https://<user>-<space>.hf.space
-  - key: RQ_CLOUD_ONLY
-    value: "1"                    # HARD-block any local torch/resumehq import
-  - key: GEMINI_API_KEY
-    sync: false                   # optional fallback; users' BYO keys are primary
-
-databases:
-- name: jobscout-db
-  plan: free
+    sync: false
+  # --- optional semantic search (Qdrant) + server Gemini ---
+  - key: QDRANT_URL
+    sync: false
+  - key: QDRANT_API_KEY
+    sync: false
+  - key: HF_TOKEN                # HF Inference API token for resume embeddings
+    sync: false
+  - key: HF_EMBED_URL           # HF Inference endpoint (router URL; see notes)
+    sync: false
+  - key: GEMINI_API_KEY         # resume parsing, chat fallback, embeddings
+    sync: false

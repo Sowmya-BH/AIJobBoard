@@ -1,14 +1,34 @@
-# Keep the app image small & correct.
-.git/
+# ── Secrets / env ───────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ── Virtual environments ────────────────────────────────────────
 myenv/
 venv/
 .venv/
-__pycache__/
-*.py[cod]
-.env
-.env.*
+
+# ── OS / editor ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────
 *.log
-jobdata/                 # the 377MB source JSON — never needed in the image
-scorer_service/          # the scorer is a SEPARATE image
-data/users.db            # mutable user DB (Postgres in prod)
-# data/app_sample.db is intentionally NOT ignored — the app needs it.
+
+# ── Databases / data (all external now: MongoDB Atlas + Qdrant) ──
+# No SQLite is used or shipped anymore — ignore every local DB.
+*.db
+*.sqlite3
+# The raw scrape JSON is huge and loaded once into Atlas — never commit it.
+*.json
+!package.json
+!**/tsconfig.json
+data/*.json
+
+# ── Docker ──────────────────────────────────────────────────────
+.docker/

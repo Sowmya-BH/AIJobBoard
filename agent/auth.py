@@ -33,7 +33,7 @@ def verify_password(pw: str, hashed: str) -> bool:
         return False
 
 
-def make_token(user_id: int) -> str:
+def make_token(user_id) -> str:
     now = int(time.time())
     return jwt.encode({"sub": str(user_id), "iat": now, "exp": now + TTL}, SECRET, algorithm=ALGO)
 
@@ -51,7 +51,7 @@ def current_user(token: str = Depends(oauth2)):
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
-    user = userstore.get_user(int(payload["sub"]))
+    user = userstore.get_user(payload["sub"])
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
     return user
