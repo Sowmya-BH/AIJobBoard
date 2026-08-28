@@ -248,4 +248,5 @@ are all set; otherwise the app uses skill-overlap ranking.
 - **This dataset has no salary field** — market analytics omit salary by design.
 
 ## Project Deliverables:
+Watch the complete breakdown of the system architecture, database design, vector pipeline, and live ATS scoring workflow:
 - https://drive.google.com/file/d/1JYQWHpjIQTB_dCtAbW0cuwc_N6rdGeQa/view?usp=sharing 
