@@ -22,6 +22,25 @@ résumés — using **your own** LLM key.
 Built to run **production-grade on free tiers**: the web app fits inside a
 **512 MB Render instance** .
 
+
+
+pload a résumé, get semantically-ranked matches, score it against any job with a real ATS/HR model, and generate cover letters, interview questions, and tailored résumés — using **your own** LLM key.
+
+> **Production-Grade on Free Tiers:** Built to run efficiently — the entire web application fits comfortably inside a **512 MB Render free instance**.
+
+---
+
+### 🌐 Live Deployments
+
+> 🚀 **Web Application (Render):**  
+> **[https://aijobboard-o52o.onrender.com](https://aijobboard-o52o.onrender.com)**  
+>
+> ⚡ **ATS Resume Scorer (Hugging Face Spaces):**  
+> **[https://rajuiscoding-resume-parser.hf.space](https://rajuiscoding-resume-parser.hf.space)**
+
+---
+
+
 **Live:** 
  
 scorer on Hugging Face Spaces :https://rajuiscoding-resume-parser.hf.space
