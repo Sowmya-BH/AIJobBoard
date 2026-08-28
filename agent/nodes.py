@@ -11,6 +11,9 @@ from .trace import traceable
 
 import asyncio
 
+# ATS scoring via ResumeHQ strict tools
+from concurrent.futures import ThreadPoolExecutor
+
 # parallel branch 1: SCOUT (retrieval, no profile needed)
 def scout_node(state):
     pool = matcher.filter_pool(domain=state.get("domain"), location=state.get("location"))
@@ -66,12 +69,11 @@ def build_jd_text(job) -> str:
             f"Required skills: {', '.join(job.get('skills', []))}\n")
 
 
-# ATS scoring via ResumeHQ strict tools
+
+
 @traceable(run_type="chain", name="ats_score_node")
-async def ats_node(state):
+def ats_node(state):
     job = matcher.get_job(state["selected_job_id"])
-    # Prefer the FULL job description (from SQLite) as the JD — far better signal
-    # for ResumeHQ than the synthesised skill line. Fall back if absent.
     full = None
     try:
         full = db.get_job(state["selected_job_id"])
@@ -79,15 +81,15 @@ async def ats_node(state):
         pass
     jd_text = (full or {}).get("description") or build_jd_text(job)
     resume_text = state.get("resume_text", "")
-    results = await asyncio.gather(
-        asyncio.to_thread(rq_tools.call, "score_ats", resume_text=res, jd_text=jd),
-        asyncio.to_thread(rq_tools.call, "score_hr", resume_text=res, jd_text=jd),
-        asyncio.to_thread(rq_tools.call, "explain_score", resume_text=res, jd_text=jd)
-    )
-    ats, hr, expl = results
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_ats  = ex.submit(rq_tools.call, "score_ats",     resume_text=resume_text, jd_text=jd_text)
+        f_hr   = ex.submit(rq_tools.call, "score_hr",      resume_text=resume_text, jd_text=jd_text)
+        f_exp  = ex.submit(rq_tools.call, "explain_score", resume_text=resume_text, jd_text=jd_text)
+        ats, hr, expl = f_ats.result(), f_hr.result(), f_exp.result()
+
     return {"ats": _reshape(full or job, jd_text, ats, hr, expl, resume_text),
             "jd_text": jd_text}
-
 
 _SKILL_ALIASES = {
     "machine learning": ["ml"], "deep learning": ["dl"],
