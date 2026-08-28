@@ -1,441 +1,222 @@
-# Job Scout + Resume ATS Agent (LangGraph + Gemini)
+# Job Scout — AI Job-Matching & ATS Agent
 
-## 📋 Project Overview
-An enterprise-grade, human-in-the-loop (HITL) job scouting and resume tailoring application prototype powered by **LangGraph, Gemini, and ResumeHQ** is an intelligent, agentic system designed to bridge the gap between job seekers and a massive database of **57,000+ job listings**. It is an end-to-end AI decision-support user workflow:
+An AI-powered job board and résumé-scoring agent over ~57,000 real job listings.
+Upload a résumé, get semantically-ranked matches, score it against any job with a
+real ATS/HR model, and generate cover letters, interview questions and tailored
+résumés — using **your own** LLM key.
 
-**Discover → Rank → Evaluate → Explain → Human Review → Improve → Re-evaluate → Generate → Apply**
+Built to run **production-grade on free tiers**: the web app fits inside a
+**512 MB Render instance** by pushing every heavy component (data, vectors, the
+SBERT/torch scorer) to external services.
 
-Unlike simple keyword-matching tools, this agent uses ResumeHQ for Semantic Scoring, **LangGraph** to orchestrate a sophisticated workflow that parses resumes, retrieves relevant jobs in parallel, and performs deep semantic scoring. The system features a **Human-in-the-Loop (HITL)** architecture, allowing users to interactively add missing experience or skills to see their ATS scores improve in real-time before generating tailored application materials.
+**Live:** app on Render · scorer on Hugging Face Spaces
 
 ---
 
-### ✨ Feature Summary
+## Tech stack
 
-* **Parallel Execution:** Utilizes LangGraph to "Scout" the job database and "Parse" the resume simultaneously, reducing latency by ~40%.
-* **Semantic ATS Scoring:** Employs a dedicated ML sidecar (ResumeHQ) using SBERT embeddings to match resume meaning rather than just keywords.
-* **Interactive HITL Loop:** Dual interrupt points allow users to select specific jobs and "re-score" their resume by providing additional context.
-* **AI Artifact Generation:** One-click generation of STAR-style resume bullets, tailored cover letters, and interview preparation questions.
-* **Enterprise Persistence:** Transparently switches between local SQLite for development and Managed Postgres for production deployment.
-* **Full Observability:** Integrated LangSmith tracing to monitor every node execution, LLM call, and tool invocation.
-## Project Architecture:
+| Layer | Technology |
+|---|---|
+| Agent orchestration | **LangGraph** (stateful graph, human-in-the-loop interrupts, checkpointer) |
+| API / web server | **FastAPI** + **Uvicorn** |
+| Jobs + user data | **MongoDB Atlas** (single database, indexed) |
+| Semantic search | **Qdrant Cloud** (vector DB) + **Sentence-BERT** `all-mpnet-base-v2` (768-dim) |
+| Résumé ATS/HR scoring | **ResumeHQ** (SBERT/torch) on a **Hugging Face Gradio + ZeroGPU** Space |
+| Auth | **JWT** (PyJWT) + **bcrypt** password hashing |
+| Secret storage | **Fernet** application-level encryption (`cryptography`) |
+| Bring-your-own LLM | OpenAI · Anthropic · Groq · any OpenAI-compatible endpoint |
+| Server-side LLM | **Google Gemini** (résumé parsing, chat fallback) |
+| Observability | **LangSmith** tracing (optional, no-op unless enabled) |
+| Frontend | Vanilla HTML/JS (auth-gated single-page app) |
 
-![Project Architecture](https://github.com/user-attachments/assets/e1f56f9d-4daf-4ced-b025-de13a8fc0e54) 
+---
+
+## Architecture
 
 ```
-START ─┬─► scout   (coarse retrieval from the 57k index — no profile needed)
-       └─► parser  (resume → structured profile — no jobs needed)
-                 └──► match  (join: score scouted pool vs profile)
-                        └──► select_job      [interrupt — pick a job]
-                               └──► ats_score
-                                      └──► human_review  [interrupt]
-                                             ├─ add_info ─► ats_score   (re-score loop)
-                                             ├─ ask / cover_letter /
-                                             │  tailored_resume /
-                                             │  interview_questions ─► extras ─► human_review
-                                             └─ done ─► END
+                      Browser (SPA)
+                           |  JWT
+                           v
+                 +-------------------+
+                 |  FastAPI (Render) |  ~150 MB, torch-free, 512 MB tier
+                 |  LangGraph agent  |
+                 +---------+---------+
+        +------------------+-------------------+------------------+
+        v                  v                   v                  v
+ MongoDB Atlas      Qdrant Cloud        HF Gradio Space     BYO / Gemini
+ jobs + users     vectors (SBERT)      ResumeHQ ATS/HR      LLM calls
+ (indexed)        semantic search      (torch/SBERT,ZeroGPU)(REST)
 ```
 
-Parallelism is real: `scout` and `parser` have no data dependency, so they run in the
-same LangGraph super-step; `match` fans them in. The two `interrupt()` points are the
-HITL gates — the CLI resumes them with `Command(resume=...)`.
+**Agent graph (LangGraph):**
+`scout || parser -> match -> select_job (interrupt) -> ats_score -> human_review
+(interrupt) -> {re-score | cover letter | interview Qs | tailored résumé | Q&A}`
 
-## 🏗️ System Architecture
-
-The project follows a **Decoupled Sidecar Architecture** to navigate the memory constraints of cloud free-tiers:
-
-* **Main Application (Render):** A lightweight, "torch-free" Python environment. It handles the LangGraph state machine, job retrieval from the 57k SQLite index, and user authentication.
-* **Scorer Sidecar (HF Spaces):** A high-memory environment (Gradio + ZeroGPU) that loads the heavy SBERT models and PyTorch - calls strict tools from **ResumeHQ**. The Main App communicates with this sidecar over a strict HTTP tool boundary (`rq_tools.py`).
-
-# 🧠 Deep Dive: What is ResumeHQ?
-
-Unlike traditional ATS systems that look for exact keyword matches, this agent uses **ResumeHQ Semantic Scoring**:
-
-* **Vector Embeddings:** Converts the full résumé and job description into high-dimensional vectors using SBERT.
-* **Contextual Matching:** Understands that *"Machine Learning"* and *"Statistical Modeling"* are related, even if the exact words differ.
-* **Layered Analysis:** After the semantic check, it layers on keyword density, readability scores, and domain-specific validation.
+Two `interrupt()` points make it genuinely human-in-the-loop: the user picks a
+job, sees the ATS/HR result, then chooses the next action — all on one
+checkpointed thread.
 
 ---
 
-## 🔄 Graph Flow & Execution:
-[Start] ──> (Scout & Parser) ──> [Match Join] ──> [Interrupt: Select Job] ──> [ATS Score ↔ Human Review]
-* **Nodes:** `scout` and `parser` run in a parallel super-step.
-* **Join:** `match` aggregates the retrieved job data and parsed resume state.
-* **Interrupt:** `select_job` pauses execution for interactive user input.
-* **Loop:** `ats_score` $\leftrightarrow$ `human_review` allows iterative resume refinement and real-time score updates.
+## Optimizations (the interesting part)
+
+Every choice below exists to keep the app **small, cheap and fast** while still
+running heavyweight NLP.
+
+### 1. Everything heavy is offloaded — the app stays under 512 MB
+- **No data in the image.** The 395 MB source JSON is ingested **once** into
+  MongoDB Atlas; the app connects by URI. No SQLite/JSON is shipped, so cold
+  starts are fast and there's no ephemeral-storage risk.
+- **No torch in the app.** ResumeHQ (SBERT + torch, ~2 GB) runs on a separate
+  **Hugging Face Gradio/ZeroGPU** Space and is called over HTTP. The app installs
+  ~13 light packages and never imports torch, `sentence-transformers`, or
+  `onnxruntime`.
+- **`runtime: python` on Render** installs only `requirements.txt` and ignores
+  every Dockerfile in the repo, so the heavy scorer image can't accidentally be
+  built into the app.
+
+### 2. Semantic search that fits a tiny box
+- Jobs are embedded **offline on a dev machine** with local Sentence-BERT and
+  upserted to **Qdrant Cloud** (~225 MB for 57k × 768-dim — under the 1 GB free
+  tier).
+- At query time the app embeds the résumé via the **HF Inference API** (one REST
+  call, `<10 MB` RAM) — the same model on both sides, so vectors are comparable.
+  No model is ever loaded in the app.
+- **Automatic fallback:** if Qdrant/HF are unset or unreachable, ranking silently
+  falls back to a fast local **skill-overlap** matcher. This also lets you **A/B
+  semantic vs keyword** accuracy just by toggling env vars.
+
+### 3. One database, indexed, schemaless
+- MongoDB holds **both** jobs and users. Filters (source/location/experience/
+  remote/skills) run as **indexed queries and aggregations** server-side instead
+  of scanning rows in Python. A lowercased `skills_lc` array powers fast `$all`
+  skill filtering and skill-frequency market analytics.
+
+### 4. Bring-your-own-key LLM (cost control)
+- Users supply their own OpenAI/Anthropic/Groq key; it's **validated, then
+  Fernet-encrypted at rest** (never stored in plaintext, never returned to the
+  client). The app spends **zero** LLM budget on user generations.
+- Keys are injected into the agent graph and honored **mid-session** (add a key
+  after scoring and the next action uses it), with a graceful fallback to
+  server-side Gemini when no key is set.
+
+### 5. Cheap, free embeddings for indexing
+- Sentence-BERT indexing runs locally (no API cost). The query-time HF Inference
+  call is free-tier friendly, and the whole 57k index builds in minutes.
+
+### 6. Offline NLP enrichment (spaCy + Gensim)
+- A one-time ingestion script adds a `canonical_skills` field using **spaCy**
+  (lemmatization + noun/tool extraction) and **Gensim Phrases** (so
+  "machine learning" is one token and won't match "washing machine"). Runs
+  offline; the app never imports spaCy.
+
+### 7. Grounded, safe scoring
+- ResumeHQ is behind a **strict tool boundary** (`rq_tools`) with an audit trail;
+  on any scorer error the app surfaces it instead of fabricating a score.
+- Résumé text is guardrail-sanitized before reaching any LLM/scorer, and logs are
+  secret-redacted.
 
 ---
 
-## ⚙️ Core AI Components
+## Repository layout
 
-* **Resume Parser:** Uses **Google Gemini** to transform unstructured text into a structured JSON profile (skills, experience, seniority). It uses a precise parser system prompt to ensure high data integrity.
-* **Semantic Scorer:** Instead of counting keywords, the sidecar creates vector embeddings of the resume and job description using **SBERT**. It calculates a cosine similarity score weighted against "Required" vs. "Nice-to-have" skills:
-  $$\text{Score} = \cos(\theta) = \frac{\mathbf{v}_{\text{resume}} \cdot \mathbf{v}_{\text{job}}}{\|\mathbf{v}_{\text{resume}}\| \|\mathbf{v}_{\text{job}}\|}$$
-* **Grounded Generation:** When generating cover letters or interview questions, the agent is strictly constrained to the provided resume text and job description to prevent hallucinated qualifications.
-
-
-## 💻 Technology Stack
-
-| Category | Tools |
-| :--- | :--- |
-| **Agent Orchestration** | LangGraph, LangChain |
-| **Large Language Models** | Google Gemini (1.5 Flash), OpenAI/Anthropic (via BYO keys) |
-| **Embedding / Scoring** | ResumeHQ, SBERT (Sentence-Transformers), PyTorch |
-| **Backend Framework** | FastAPI, Uvicorn |
-| **Database / Persistence** | SQLite (Jobs/Dev), PostgreSQL (Production Users), MemorySaver |
-| **Observability** | LangSmith |
-| **Deployment / Infra** | Render (Web App), Hugging Face Spaces (Gradio Scorer), Docker |
-
-## Run the web app (front end + backend): 
-The application supports both a browser-based UI and an interactive CLI. In the browser,
-
-# 🚀 Live Deployment
-
-| Service | Status | URL |
-| :--- | :--- | :--- |
-| **Main Web App** | 🟢 Live on Render | [aijobboard-o52o.onrender.com](https://aijobboard-o52o.onrender.com) |
-| **AI Scoring Engine** | ⚡ HF Space (Gradio) | [rajuiscoding-resume-parser.hf.space](https://rajuiscoding-resume-parser.hf.space) |
-| **Observability** | 📊 Tracing Enabled | LangSmith Dashboard |
+```
+server.py                     FastAPI app + all routes
+agent/
+  graph.py                    LangGraph wiring
+  nodes.py                    graph nodes (scout, match, ATS, review, extras)
+  state.py                    graph state (incl. per-session BYO creds)
+  db.py                       MongoDB jobs access (queries, facets, market intel)
+  userstore.py                MongoDB users / profiles / saved jobs
+  auth.py                     JWT + bcrypt
+  crypto.py                   Fernet encryption for stored API keys
+  llm.py                      server-side Gemini (parsing, chat fallback)
+  llm_user.py                 BYO-key LLM adapter (OpenAI/Anthropic/Groq/custom)
+  vectors.py                  Qdrant + HF-Inference SBERT embeddings (query side)
+  matcher.py                  skill-overlap ranking (fallback)
+  rq_tools.py                 strict ResumeHQ tool boundary (REST or Gradio)
+  guardrails.py, trace.py, config.py
+data/
+  build_mongo.py              one-time: raw JSON -> MongoDB Atlas
+  build_embeddings.py         one-time: jobs -> SBERT -> Qdrant (local encode)
+  build_canonical_skills.py   one-time: spaCy/Gensim skill enrichment
+web/                          landing / login / app (HTML/JS)
+scorer_service/               ResumeHQ scorer for Hugging Face (Gradio/ZeroGPU)
+render.yaml                   Render Blueprint (python runtime, app-only)
+```
 
 ---
 
-# 🏗 Architecture & Deployment
+## Setup
 
-The application is split into two specialized environments to optimize performance and stay within free-tier resource limits:
+### 1. One-time data load (run locally, not on Render)
+```bash
+pip install ijson pymongo
+export MONGODB_URI="mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority"
+export MONGODB_DB=jobscout
+python data/build_mongo.py --source /path/to/query_result.json --desc-cap 1500 --drop
+```
 
-### Main Application (Render)
-* **Runtime:** Native Python (Non-Docker) to minimize overhead.
-* **Stack:** FastAPI + LangGraph + SQLite.
-* **Memory:** Optimized to run under 200MB, fitting easily within Render's 512MB free limit.
-* **Responsibility:** Handles user authentication (`bcrypt`), job scouting (57k index), and the LangGraph state machine.
+### 2. Optional: build the vector index (semantic search)
+```bash
+pip install sentence-transformers
+export QDRANT_URL=https://xxxx.cloud.qdrant.io:6333
+export QDRANT_API_KEY=...
+python data/build_embeddings.py --limit 2 --recreate --batch 2   # dry run
+python data/build_embeddings.py --recreate                        # full 57k
+```
 
-### Semantic Scorer Sidecar (Hugging Face Spaces)
-* **Runtime:** Gradio + ZeroGPU.
-* **Stack:** SBERT (Sentence-Transformers) + PyTorch.
-* **Responsibility:** Performs the heavy lifting of ResumeHQ scoring. It uses GPU-accelerated embeddings to compare the semantic meaning of a resume against a job description.
+### 3. Optional: skill enrichment
+```bash
+pip install spacy gensim && python -m spacy download en_core_web_sm
+python data/build_canonical_skills.py
+```
 
-### How They Communicate
-The Render app acts as the orchestrator. When a user selects a job, the app sends an internal HTTP request to the Hugging Face Scorer via the `RQ_SCORER_URL`. This **Sidecar architecture** prevents the main web app from crashing due to high memory demands of ML models (OOM errors).
+### 4. Deploy the scorer (Hugging Face Space)
+Create a **Docker** or **Gradio** Space from `scorer_service/`, select **ZeroGPU**
+hardware. Note the Space URL.
 
----
-
-
-# 🛠️ Setup & Run Instructions
-
-To run the complete system locally, execute the following commands in separate terminal sessions:
-
-* **Terminal 1 — AI Scoring Engine (Sidecar)**  
-  Starts the heavy GPU/ML sidecar service on port 8100:
-  ```bash
-  cd scorer_service && uvicorn app:app --port 8100
-* **Terminal 2 — Main Web Application**  
-export RQ_SCORER_URL=http://localhost:8100
-uvicorn server:app --port 8000
-
-```## Run the CLI instead
+### 5. Run the app
+```bash
 pip install -r requirements.txt
-export GEMINI_API_KEY=...                  # optional; stubs used if unset
-export JOBS_INDEX=data/jobs_index.jsonl    # full 57k; omit for the 3k sample
-
-uvicorn server:app --reload
+export MONGODB_URI=...            # required
+export RQ_SCORER_KIND=gradio RQ_SCORER_URL=https://<user>-<space>.hf.space
+export GEMINI_API_KEY=...  GEMINI_MODEL=gemini-2.0-flash
+# optional semantic search:
+export QDRANT_URL=... QDRANT_API_KEY=... HF_TOKEN=... \
+       HF_EMBED_URL=https://router.huggingface.co/hf-inference/models/sentence-transformers/all-mpnet-base-v2/pipeline/feature-extraction
+uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-* server:app: Runs the main application module (Web UI + LangGraph state machine). It handles semantic scoring either by importing ResumeHQ in-process or by executing an HTTP call to the sidecar service.
-
-* app:app (inside scorer_service/): Runs the standalone local scorer module that hosts the dedicated scoring service.
-  
-Then open **http://127.0.0.1:8000** — paste or upload a resume, pick a domain,
-click *Find matching jobs*, select a job, review the ATS score, add info to
-re-score, and generate a cover letter / tailored resume / interview questions.
-
-The browser UI (`web/index.html`) is a single static file with no build step; it
-talks to three FastAPI endpoints that map onto the graph's two interrupts:
-`/api/start` (→ select_job interrupt), `/api/select` (→ review interrupt),
-`/api/action` (add_info re-score / ask / generate / done).
-
-### Run the CLI 
-
-```bash
-python run.py --resume my_resume.pdf --domain "Data Science"
-```
-
-`--domain` is `Data Science` or `Web Development`. `--resume` accepts `.txt/.md/.pdf/.docx`.
-Omit `--resume` to run with a built-in demo profile.
-
-## Files
-
-| File | Role |
-|------|------|
-| `agent/graph.py` | assembles the StateGraph (fork, interrupts, conditional loop) |
-| `agent/nodes.py` | scout, parser, match, select_job, ats_score, human_review, extras |
-| `agent/matcher.py` | deterministic skill overlap + **weighted ATS** (required vs nice-to-have) |
-| `agent/llm.py` | Gemini wrapper with no-key fallback |
-| `agent/state.py` | shared graph state |
-| `run.py` | interactive CLI driving the HITL loop |
-| `data/jobs_index.jsonl` | slim 57k index built from your source dump |
-| `data/jobs_sample.jsonl` | 3k sample for fast startup |
-
-## New features (auth, filters, market intel)
-
-### Persistence on Render (SQLite writes are ephemeral)
-
-Render's container filesystem is wiped on every deploy/restart, so a *writable*
-SQLite file does not persist and is not shared across instances. The fix is to
-split by mutability:
-
-- **Jobs** — read-only SQLite baked into the image (`APP_DB`). Immutable and
-  rebuilt each deploy, so ephemeral storage is fine.
-- **User data** (users / profiles / saved_jobs) — `agent/userstore.py`. Set
-  `DATABASE_URL` and it uses **Postgres** (durable, shared); unset, it falls back
-  to a local SQLite file (`USER_DB`, dev only).
-
-`render.yaml` provisions a managed Postgres (`jobscout-db`) and injects its
-`connectionString` as `DATABASE_URL`. No app code changes between local and prod
-— same queries, different backend (`?`→`%s`, `SERIAL` vs `AUTOINCREMENT`, and
-`RETURNING id` are handled in userstore). The Postgres path is written to spec
-but was validated here only on the SQLite fallback (no Postgres in the build
-sandbox) — verify on first deploy. Do NOT use `:memory:`; it lives only in RAM.
-
-### Database as the single store (offloading the big JSON)
-
-Yes — the ~377 MB source JSON should not ship or load at runtime. `data/build_db.py`
-ingests it once into SQLite (`jobs` + auth tables); the app then only touches the
-DB. As of now **SQLite is the single source**: job ranking, browse/filters, JD,
-market intel, recommendations, auth and saved jobs all read from it, and the old
-20 MB `jobs_index.jsonl` is gone. Ship just `data/app.db` (or the 13 MB
-`app_sample.db`). Full DB with capped descriptions is ~196 MB vs the 377 MB JSON;
-drop `--desc-cap` lower to shrink further.
-
-### Recommended jobs
-
-`GET /api/recommended` ranks jobs against the saved profile (skill overlap +
-preferred-title match, filtered by preferred location / remote pref). The
-dashboard shows the count and the home page lists the top matches after login.
-
-### LangSmith tracing
-
-Fully wired — see **TRACING.md** for a table of every graph node and traced
-function (inputs, outputs, span type, and why). Toggle with
-`LANGCHAIN_TRACING_V2` + `LANGCHAIN_API_KEY`; off = zero overhead.
-
-
-
-Backend is SQLite-backed (`agent/db.py`) and all endpoints below are tested.
-
-- **Auth** — `POST /api/auth/register|login` (bcrypt hashing + JWT), `GET /api/auth/me`.
-  OAuth was removed (Google/GitHub). Instead a built-in **admin** account is
-  seeded on startup from `ADMIN_EMAIL`/`ADMIN_PASSWORD` (default `admin@local` /
-  `admin12345` — change in production). Admin-only endpoints use `is_admin`, e.g.
-  `GET /api/admin/summary`.
-- **Profile** — `GET/PUT /api/profile` (name, location, exp, skills, preferred
-  titles/locations, remote|hybrid|onsite, experience level).
-- **Saved jobs + dashboard** — `POST/DELETE /api/jobs/{id}/save` (status =
-  saved|applied|interview), `GET /api/saved`, `GET /api/dashboard` (welcome +
-  counts). UI shows the chips after login.
-- **Source dropdown + filters** — `GET /api/facets`, `GET /api/jobs?source=&skills=
-  &location=&min_exp=&max_exp=&domain=&remote=`. Sources are the dataset's REAL
-  `via` values (LinkedIn dominates; Naukri/Indeed are barely present).
-- **JD-on-select** — `GET /api/jobs/{id}` returns the full description; the AI
-  match now scores against the real JD, not a synthesised skill line.
-- **AI match card + "Why?"** — the ATS report carries `apply_verdict`
-  (YES/MAYBE/NO), `apply_confidence`, `strengths`, `concerns` (from ResumeHQ HR).
-- **Market intelligence** — `GET /api/market`: top skills, top companies, top
-  locations, remote-vs-onsite, month-over-month emerging skills. Salary is NOT in
-  the dataset (12/56,769 rows) so it is omitted rather than faked.
-- **Guardrails** — `agent/guardrails.py` caps size and strips prompt-injection
-  before text reaches the LLM/scorer; short/empty resumes are rejected (400).
-- **LangSmith** — set `LANGCHAIN_TRACING_V2=true` + `LANGCHAIN_API_KEY`
-  (+ `LANGCHAIN_PROJECT`); LangGraph auto-traces every node.
-
-### Build the jobs DB
-
-```bash
-# full 57k (production): needs the original dump
-python data/build_db.py --source /path/to/query_result.json --out data/app.db
-export APP_DB=data/app.db
-```
-A 4,000-job `data/app_sample.db` ships for instant startup. Set a strong
-`JWT_SECRET` in production (the default warns).
-
-## Resume scoring: ResumeHQ (via strict tools)
-
-Resume scoring is done by **ResumeHQ** (PyPI: `resumehq`), imported in-process —
-no separate MCP server. IMPORTANT: the package installs FLAT modules, so the
-real import is:
-
-```python
-from mcp_scorer import score_ats, score_hr, explain_score, generate_cover_letter
-```
-
-`import resumehq` / `resumehq.ResumeBuilder()` do **not** exist (that was a wrong
-snippet). Console script: `resumehq-mcp`.
-
-All ResumeHQ access goes through `agent/rq_tools.py`, which enforces the three
-MCP disciplines while running as a plain import:
-
-- **Enumerate strict tools** — `TOOLS` is a fixed registry (`score_ats`,
-  `score_hr`, `explain_score`, `generate_cover_letter`, `extract_text`). Unknown
-  names and missing required args are rejected before anything runs.
-- **Force ground truth** — the scorer's raw dict is returned unchanged. The app
-  never invents a score, keyword, or tip. If `resumehq` isn't installed (or a
-  tool has no data) callers get an explicit `{"error": ...}` — never a fake number.
-- **Audit trail** — every call is logged (id, UTC timestamp, tool, input SHA +
-  length, returned keys, score, latency) to memory and an append-only JSONL
-  (`RQ_AUDIT_LOG`). View it at `GET /api/audit` or the "view audit trail" link.
-
-The old custom scorer is retired for scoring; the fast skill-overlap matcher is
-kept only for **job ranking** (retrieval over 57k rows — not resume scoring).
-
-`score_ats` gives `total_score`, `matched_keywords`, `missing_keywords`, `rating`;
-`score_hr` gives `overall_score`, `recommendation`, `strengths`, `concerns`, and
-`suggested_questions` (used verbatim for the Interview Questions output —
-grounded, not model-invented).
-
-### Memory & deployment profiles (the 512 MB / OOM question)
-
-`import mcp_scorer` is light — measured at ~76 MB, and it does **not** load
-torch: ResumeHQ imports its local scorers lazily, only when a score falls
-through to the local engine. The heavy cost (sentence-transformers + torch +
-SBERT model, well over 512 MB) is paid **only on the local path**. So:
-
-| Profile | Install | Scoring | RAM | Fits 512 MB? |
-|---------|---------|---------|-----|--------------|
-| **Cloud (production)** | `pip install resumehq --no-deps` then `pip install fastmcp` | Hosted scorer (`resume-scorer.fly.dev`) | ~76 MB + app | **Yes** |
-| **Local (dev/offline)** | `pip install resumehq` (pulls torch) | In-process SBERT | > 512 MB | No — needs its own process |
-
-**Production recipe (single process, under budget):**
-
-```bash
-pip install -r requirements.txt          # app deps incl. fastmcp (no torch)
-pip install resumehq --no-deps           # ResumeHQ modules only, torch NOT pulled
-export SCORER_CLOUD_API_KEY=...          # from getresumehq.com (free tier = 5 scores)
-export RQ_CLOUD_ONLY=1                    # hard-disable the local fallback
-uvicorn server:app
-```
-
-With `RQ_CLOUD_ONLY=1`, if a cloud call misses, `rq_tools` blocks the local
-scorer from importing torch and returns an explicit audited error instead of
-OOM-killing the container. Verified: cloud-miss under this flag stays at ~99 MB
-with torch never loaded.
-
-**If you need offline/self-hosted scoring** you cannot keep it in the same
-512 MB process — torch+SBERT alone exceed it. Run ResumeHQ's scorer as a
-separate process with its own memory budget and call it over HTTP:
-
-```bash
-# scorer container (full deps, its own memory):  resumehq-mcp    (the bundled MCP server)
-# or a thin HTTP wrapper exposing score_ats/score_hr; point the app at it.
-```
-
-This is the one place the memory limit forces a process split — everything else
-stays in the single app runtime.
-
-## Self-hosted scorer sidecar (unlimited, no free-tier cap)
-
-`scorer_service/` is a ready-to-run FastAPI wrapper around ResumeHQ's LOCAL
-engines. Because it scores locally, it has **no 5-score cap** (that limit lives
-in the ResumeHQ cloud) and needs no `SCORER_CLOUD_API_KEY`.
-
-Topology: two containers, two memory budgets.
-
-```
-  ┌────────────┐   RQ_SCORER_URL   ┌──────────────────┐
-  │  app        │ ───HTTP─────────► │  scorer sidecar   │
-  │  ~512 MB    │  /score/ats …     │  full torch/SBERT │
-  │  torch-free │ ◄──JSON────────── │  own (larger) RAM │
-  └────────────┘                    └──────────────────┘
-```
-
-Bring both up:
-
-```bash
-docker compose up --build      # app on :8000, scorer internal on :8100
-```
-
-`docker-compose.yml` sets `RQ_SCORER_URL=http://scorer:8100` on the app and caps
-the app at 512 MB / the scorer at 2 GB. The app never imports torch (verified
-~174 MB); every score is an HTTP call, audited with `"via": "remote"`.
-
-Endpoints: `POST /score/ats`, `/score/hr`, `/explain`, `/cover-letter`, `GET /health`.
-Cover letters need an LLM: ResumeHQ's local path can't generate them (the wheel
-omits `llm_scorer`), so the app falls back to Gemini for the letter, grounded on
-the final resume.
-
-## Deploy on Render
-
-
-
-`render.yaml` defines two services that match the memory split:
-
-| Service | Render type | Plan | torch? | Public? |
-|---------|-------------|------|--------|---------|
-| `job-scout-app` | `web` | free (512 MB) | no | yes |
-| `resumehq-scorer` | `pserv` (private) | paid (~2 GB) | yes | no (internal only) |
-
-Render → **New → Blueprint** → pick the repo.
-Render builds both, and injects the scorer's internal `host:port` into the app's
-`RQ_SCORER_URL` (rq_tools adds the `http://`). Set `GEMINI_API_KEY` (app) and
-optional user api_key (for cover letters, interview) uploaded by the user in the dashboard.
-
-**Feasibility, stated plainly:** you cannot run everything on one free 512 MB
-Render service — torch+SBERT alone exceed it and Render will OOM-kill the
-instance. Your options:
-
-1. **App free + scorer paid private service** (this `render.yaml`) — unlimited
-   local scoring, no cloud cap. Costs the scorer plan.
-2. **App free + ResumeHQ cloud** (`SCORER_CLOUD_API_KEY`, `RQ_CLOUD_ONLY=1`, no
-   scorer service) — $0 infra but capped at the cloud free tier (5 scores) until
-   you buy ResumeHQ Pro.
-3. **Scorer off-Render** (any host with ≥2 GB) + app free on Render pointing
-   `RQ_SCORER_URL` at it.
-
-Plan names and free-tier terms change — confirm current Render docs before you
-rely on the numbers above.
-
-Run the sidecar without Docker:
-
-```bash
-cd scorer_service && pip install resumehq fastapi "uvicorn[standard]"
-uvicorn app:app --host 0.0.0.0 --port 8100
-# then, for the app:  export RQ_SCORER_URL=http://localhost:8100
-```
-
-
-## The revise loop
-
-After scoring, the human-in-the-loop review lets you, repeatedly:
-- **add_info** — describe experience to add; the agent folds it into the working
-  resume, **re-scores**, and shows *how to add it* as a resume bullet.
-- **upload_resume** — upload a fully revised resume; the agent re-scores it.
-
-Loop until satisfied, then pick **cover letter / interview questions / tailored
-resume** — all computed against the *final* resume text.
-
-## ATS scoring note
-
-Skill *counts* are deterministic and reproducible — the LLM only writes the
-explanations and (when a key is set) splits each job's skills into **required vs
-nice-to-have** so short postings don't inflate to 100%. Postings with <3 listed
-skills are marked `low` confidence and discounted. Verified: a 4-required-skill job
-scores 50 with 2 hits, then 100 after the user adds the 4 missing skills via HITL.
-
-
-## ⚠️ Known Limitations & Trade-offs
-
-* **Memory Constraints:** The main application is strictly "torch-free." Attempting to run ResumeHQ's local engine within the Render Free Tier (512MB) will trigger an OOM (Out of Memory) crash.
-* **SQLite Persistence:** SQLite writes on Render are ephemeral. For production deployment, you must configure `DATABASE_URL` to point to the included PostgreSQL blueprint.
-* **Cold Starts:** The HF Scorer sidecar may go to sleep on free tiers. The main application includes a timeout and audit log to track and report these connectivity gaps.
-* **Rate Limits:** The system relies heavily on model API rate limits via the user interface. High-frequency re-scoring within the HITL loop may hit free-tier quotas.
-
-## Project Deliverables:
-Here is the video explanation for my project:
-https://drive.google.com/file/d/1on3REbJvE-_M6evvakLq80P4mTQi3jUz/view?usp=sharing 
-
-#### How do I know my API key is working?
-When you enter your key in the Settings tab, the agent attempts a lightweight `GET` request to the provider's models list. If successful, you will see the confirmation screen shown below:
-
-<img width="3024" height="1964" alt="314FC9F0-AD99-4BF6-8F21-4C7E0FDA0108" src="https://github.com/user-attachments/assets/50caed15-5f61-41ac-8853-71173631993b" />
-
-
-
-
-
+### Deploy to Render
+Push to GitHub -> **New -> Blueprint** (uses `render.yaml`, `runtime: python`).
+Set the `sync: false` env vars in the dashboard. Start command:
+`uvicorn server:app --host 0.0.0.0 --port $PORT`.
+
+---
+
+## Environment variables
+
+| Variable | Purpose | Required |
+|---|---|---|
+| `MONGODB_URI` / `MONGODB_DB` | jobs + users database | yes |
+| `RQ_SCORER_KIND` / `RQ_SCORER_URL` | ResumeHQ scorer (`gradio` + Space URL) | for scoring |
+| `RQ_SCORER_HF_TOKEN` | token for a private scorer Space | optional |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | résumé parsing + chat fallback | recommended |
+| `QDRANT_URL` / `QDRANT_API_KEY` | vector search | optional |
+| `HF_TOKEN` / `HF_EMBED_URL` | résumé embeddings (HF Inference) | optional |
+| `JWT_SECRET` / `APP_ENCRYPTION_KEY` | auth + key encryption (auto-generated on Render) | yes |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seeded admin account | optional |
+| `LANGCHAIN_TRACING_V2` / `LANGCHAIN_API_KEY` | LangSmith tracing | optional |
+
+Semantic search activates only when `QDRANT_URL`, `QDRANT_API_KEY` and `HF_TOKEN`
+are all set; otherwise the app uses skill-overlap ranking.
+
+---
+
+## Notes & limits
+- **Free-tier sizing:** 57k jobs *with full descriptions* can exceed Atlas M0
+  (512 MB) — cap descriptions (`--desc-cap`) on ingestion.
+- **Scorer cold start:** a sleeping HF Space adds a few seconds on the first
+  score; the app degrades gracefully if it's unreachable.
+- **This dataset has no salary field** — market analytics omit salary by design.
