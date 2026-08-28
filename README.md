@@ -1,15 +1,31 @@
 # Job Scout — AI Job-Matching & ATS Agent
 
+
+# Job Scout
+
+### **An AI-powered job board and résumé-scoring agent over ~57,000 real job listings.**
+
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248.svg?logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-dc2626.svg?logo=qdrant&logoColor=white)](https://qdrant.tech)
+[![Render](https://img.shields.io/badge/Render-Hosted-46E3B7.svg?logo=render&logoColor=white)](https://render.com)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Spaces-FFD21E.svg?logo=huggingface&logoColor=black)](https://huggingface.co)
+
+
+
 An AI-powered job board and résumé-scoring agent over ~57,000 real job listings.
 Upload a résumé, get semantically-ranked matches, score it against any job with a
 real ATS/HR model, and generate cover letters, interview questions and tailored
 résumés — using **your own** LLM key.
 
 Built to run **production-grade on free tiers**: the web app fits inside a
-**512 MB Render instance** by pushing every heavy component (data, vectors, the
-SBERT/torch scorer) to external services.
+**512 MB Render instance** .
 
-**Live:** app on Render · scorer on Hugging Face Spaces
+**Live:** 
+ 
+scorer on Hugging Face Spaces :https://rajuiscoding-resume-parser.hf.space
+app on Render -- https://aijobboard-o52o.onrender.com
 
 ---
 
@@ -178,7 +194,12 @@ pip install spacy gensim && python -m spacy download en_core_web_sm
 python data/build_canonical_skills.py
 ```
 
-### 4. Deploy the scorer (Hugging Face Space)
+### 4. Deployment architecture the scorer (Hugging Face Space):
+
+it is available on :
+
+https://aijobboard-o52o.onrender.com 
+https://huggingface.co/spaces/RajuisCODING/resume-parser
 Create a **Docker** or **Gradio** Space from `scorer_service/`, select **ZeroGPU**
 hardware. Note the Space URL.
 
