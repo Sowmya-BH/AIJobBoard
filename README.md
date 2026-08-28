@@ -240,9 +240,12 @@ are all set; otherwise the app uses skill-overlap ranking.
 
 ---
 
-## Notes & limits
+## Notes & limitations:
 - **Free-tier sizing:** 57k jobs *with full descriptions* can exceed Atlas M0
   (512 MB) — cap descriptions on ingestion.
 - **Scorer cold start:** a sleeping HF Space adds a few seconds on the first
   score; the app degrades gracefully if it's unreachable.
 - **This dataset has no salary field** — market analytics omit salary by design.
+
+## Project Deliverables:
+- https://drive.google.com/file/d/1JYQWHpjIQTB_dCtAbW0cuwc_N6rdGeQa/view?usp=sharing 
