@@ -1,8 +1,5 @@
 # Job Scout — AI Job-Matching & ATS Agent
 
-
-# Job Scout
-
 ### **An AI-powered job board and résumé-scoring agent that is a AI heavy system (57,000 jobs + deep scoring) is managed on a tiny 512MB RAM budget by offloading math to the cloud.
 BusineUpload a résumé, get semantically-ranked matches, score it against any job with a real ATS/HR model, and generate cover letters, interview questions and tailored résumés — using **your own** LLM key** that uses Python and Fast API in the backend.
 
