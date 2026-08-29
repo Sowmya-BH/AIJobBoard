@@ -202,6 +202,7 @@ python data/build_canonical_skills.py
 it is available on :
 
 https://aijobboard-o52o.onrender.com 
+
 https://huggingface.co/spaces/RajuisCODING/resume-parser
 Create a **Docker** or **Gradio** Space from `scorer_service/`, select **ZeroGPU**
 hardware. Note the Space URL.
