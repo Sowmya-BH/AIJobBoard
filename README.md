@@ -137,8 +137,7 @@ running heavyweight NLP.
   offline; the app never imports spaCy.
 
 ### 7. Grounded, safe scoring
-- ResumeHQ, a conversational AI resume builder and generation and ATS optimization,is behind a **strict tool boundary** (`rq_tools`) with an audit trail;
-  on any scorer error the app surfaces it instead of fabricating a score.
+- ResumeHQ, a conversational AI resume builder with insustry standard ATS optimizated score generation     and skills listing,is behind a **strict tool boundary** (`rq_tools`) with an audit trail;on any scorer   error the app surfaces it instead of fabricating a score.
 - Résumé text is guardrail-sanitized before reaching any LLM/scorer, and logs are
   secret-redacted.
 
