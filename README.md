@@ -61,12 +61,16 @@ Built to run **production-grade on free tiers**: the web app fits inside a
                  +-------------------+
                  |  FastAPI (Render) |  ~150 MB, torch-free, 512 MB tier
                  |  LangGraph agent  |
-                 +---------+---------+
-        +------------------+-------------------+------------------+
-        v                  v                   v                  v
- MongoDB Atlas      Qdrant Cloud        HF Gradio Space     BYO / Gemini
- jobs + users     vectors (SBERT)      ResumeHQ ATS/HR      LLM calls
- (indexed)        semantic search      (torch/SBERT,ZeroGPU)(REST)
+                 +----+----+----+----+
+                      |    |    |
+      +---------------+    |    +---------------+
+      v                    v                    v
+MongoDB Atlas         Qdrant Cloud       HF Gradio Space
+ jobs + users       vectors (SBERT)   ResumeHQ ATS/HR Assistant
+  (indexed)        semantic search    (torch/SBERT, ZeroGPU)
+                          ^
+                          | (REST via HF Inference Client)
+                          +---------------------+
 ```
 
 **Agent graph (LangGraph):**
