@@ -100,7 +100,8 @@ running heavyweight NLP.
   every Dockerfile in the repo, so the heavy scorer image can't accidentally be
   built into the app.
 
-### 2. Semantic search that fits a tiny box
+### 2. Semantic search that fits a tiny box:
+- Is semantic search required?  If I used standard keyword search, users would miss 60% of relevant jobs   due to different naming conventions. By using LangGraph, I created a system that can pause and wait      for human judgment, and by using Qdrant, I ensured that the retrieval of those 57,000 jobs remains       sub-second and conceptually accurate."
 - Jobs are embedded **offline on a dev machine** with local Sentence-BERT and
   upserted to **Qdrant Cloud** (~225 MB for 57k × 768-dim — under the 1 GB free
   tier).
